@@ -80,7 +80,7 @@ $(document).ready(function() {
 
 				translator.load(config.defaultLang, tpl_url);
 
-				$('#footer, #content').removeClass('hide').addClass('ajaxifying');
+				//$('#footer, #content').removeClass('hide').addClass('ajaxifying');
 				var animationDuration = parseFloat($('#content').css('transition-duration')) || 0.2,
 					startTime = (new Date()).getTime();
 
@@ -113,7 +113,7 @@ $(document).ready(function() {
 
 								app.processPage();
 
-								$('#content, #footer').removeClass('ajaxifying');
+								//$('#content, #footer').removeClass('ajaxifying');
 								ajaxify.initialLoad = false;
 
 								app.refreshTitle(url);

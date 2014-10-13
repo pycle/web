@@ -516,6 +516,9 @@ var socket,
 				hash = window.location.hash,
 				$window = $(window);
 
+			require(['paginator'], function(paginator) {
+				paginator.init();
+			});
 
 			$window.trigger('action:ajaxify.start', {
 				url: url
