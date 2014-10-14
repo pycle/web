@@ -3,7 +3,8 @@
 /* globals app, define */
 
 define('paginator', ['forum/pagination'], function(pagination) {
-	var paginator = {};
+	var paginator = {},
+		frame;
 	
 	paginator.init = function() {
 		var options = {
@@ -18,24 +19,23 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			touchDragging: 1,
 			releaseSwing: 1
 		};
-		var frame = new Sly('#frame', options);
-
-		// Initiate frame
+		
+		frame = new Sly('#frame', options);
 		frame.init();
 
 		$('html').addClass('paginated'); // allows this to work for non-JS browsers
 
-		// Reload on resize
 		$(window).on('resize', function() {
 			frame.reload();
 		}).on('action:ajaxify.end', function() {
-			setTimeout(function() {
-				frame.reload();
-			}, 50);
+			frame.reload();
 		});
 
-
 		window.derp = frame;
+	};
+
+	paginator.reload = function() {
+		frame.reload();
 	};
 
 	return paginator;
