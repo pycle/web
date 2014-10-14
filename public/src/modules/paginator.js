@@ -30,6 +30,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		$('html').addClass('paginated'); // allows this to work for non-JS browsers
 
+		//todo key-bindings
+
 		$(window).on('resize action:ajaxify.end', function() {
 			paginator.reload();
 		});
@@ -84,7 +86,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	paginator.setCount = function(value) {
 		count = parseInt(value, 10);
-		paginator.updateTextAndProgressBar();
+		updateTextAndProgressBar();
 	};
 
 	paginator.scrollTop = function(index) {
@@ -126,7 +128,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			if (elementInView(el)) {
 				if (typeof paginator.callback === 'function') {
 					index = paginator.callback(el, count);
-					paginator.updateTextAndProgressBar();
+					updateTextAndProgressBar();
 				}
 
 				return false;
@@ -165,9 +167,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		var done = false;
 		function animateScroll() {
-			$('html, body').animate({
-				scrollTop: (scrollTo.offset().top - $('#header-menu').height() - offset) + 'px'
-			}, duration, function() {
+			//todo, ask baris about duration
+
+			frame.slideTo(scrollTo.offset().top - $('#header-menu').height() - offset);
+			frame.one('moveEnd', function() {
 				if (done) {
 					return;
 				}
@@ -176,6 +179,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				paginator.scrollActive = false;
 				paginator.update();
 				highlightPost();
+
+				// what is this for
 				$('body').scrollTop($('body').scrollTop() - 1);
 				$('html').scrollTop($('html').scrollTop() - 1);
 			});
