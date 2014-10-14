@@ -1,4 +1,4 @@
-define('search', ['navigator'], function(nav) {
+define('search', ['paginator'], function(paginator) {
 	"use strict";
 	/* globals socket, ajaxify */
 
@@ -74,7 +74,7 @@ define('search', ['navigator'], function(nav) {
 			topicSearchEl.removeClass('hidden').find('.prev, .next').removeAttr('disabled');
 			Search.checkPagePresence(Search.current.tid, function() {
 				socket.emit('posts.getPidIndex', Search.current.results[index], function(err, postIndex) {
-					nav.scrollToPost(postIndex-1, true);	// why -1? Ask @barisusakli
+					paginator.scrollToPost(postIndex-1, true);	// why -1? Ask @barisusakli
 				});
 			});
 		} else {

@@ -2,7 +2,7 @@
 
 /* globals define, app, translator, ajaxify, socket, bootbox */
 
-define('forum/topic/postTools', ['composer', 'share', 'navigator'], function(composer, share, navigator) {
+define('forum/topic/postTools', ['composer', 'share', 'paginator'], function(composer, share, paginator) {
 
 	var PostTools = {},
 		topicName;
@@ -30,7 +30,7 @@ define('forum/topic/postTools', ['composer', 'share', 'navigator'], function(com
 		socket.emit('topics.postcount', ajaxify.variables.get('topic_id'), function(err, postCount) {
 			if (!err) {
 				$('.topic-post-count').html(postCount);
-				navigator.setCount(postCount);
+				paginator.setCount(postCount);
 			}
 		});
 	};
