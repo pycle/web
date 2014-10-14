@@ -1,10 +1,11 @@
 "use strict";
 
-/* globals app, define */
+/* globals app, define, Sly */
 
 define('paginator', ['forum/pagination'], function(pagination) {
 	var paginator = {},
-		frame;
+		frame,
+		scrollbar;
 	
 	paginator.init = function() {
 		var options = {
@@ -22,6 +23,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		
 		frame = new Sly('#frame', options);
 		frame.init();
+		scrollbar = $('#scrollbar');
 
 		$('html').addClass('paginated'); // allows this to work for non-JS browsers
 
@@ -31,12 +33,26 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			frame.reload();
 		});
 
-		window.derp = frame;
+		frame.on('moveEnd', hideScrollbar);
+		scrollbar.on('mouseout', hideScrollbar);
+
+		frame.on('moveStart', showScrollbar);
+		scrollbar.on('mouseover', showScrollbar);
 	};
 
 	paginator.reload = function() {
 		frame.reload();
 	};
+
+	function hideScrollbar() {
+		setTimeout(function() {
+			scrollbar.addClass('translucent');
+		}, 3000);
+	}
+
+	function showScrollbar() {
+		scrollbar.removeClass('translucent');
+	}
 
 	return paginator;
 });
