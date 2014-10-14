@@ -5,7 +5,8 @@
 define('paginator', ['forum/pagination'], function(pagination) {
 	var paginator = {},
 		frame,
-		scrollbar;
+		scrollbar,
+		animationTimeout = null;
 	
 	paginator.init = function() {
 		var options = {
@@ -27,10 +28,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		$('html').addClass('paginated'); // allows this to work for non-JS browsers
 
-		$(window).on('resize', function() {
-			frame.reload();
-		}).on('action:ajaxify.end', function() {
-			frame.reload();
+		$(window).on('resize action:ajaxify.end', function() {
+			paginator.reload();
 		});
 
 		frame.on('moveEnd', hideScrollbar);
@@ -47,7 +46,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	function hideScrollbar() {
-		setTimeout(function() {
+		clearTimeout(animationTimeout);
+		animationTimeout = setTimeout(function() {
 			scrollbar.addClass('translucent');
 		}, 3000);
 	}
