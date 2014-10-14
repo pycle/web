@@ -38,6 +38,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		frame.on('moveStart', showScrollbar);
 		scrollbar.on('mouseover', showScrollbar);
+
+		hideScrollbar();
 	};
 
 	paginator.reload = function() {
