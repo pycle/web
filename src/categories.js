@@ -167,8 +167,8 @@ var db = require('./database'),
 	};
 
 	Categories.getPageCount = function(cid, uid, callback) {
-		db.sortedSetCard('categories:' + cid + ':tid', function(err, topicCount) {
-			if(err) {
+		Categories.getCategoryField(cid, 'topic_count', function(err, topicCount) {
+			if (err) {
 				return callback(err);
 			}
 
@@ -177,7 +177,7 @@ var db = require('./database'),
 			}
 
 			user.getSettings(uid, function(err, settings) {
-				if(err) {
+				if (err) {
 					return callback(err);
 				}
 
@@ -248,13 +248,29 @@ var db = require('./database'),
 	};
 
 	Categories.markAsRead = function(cids, uid, callback) {
+		callback = callback || function() {};
 		if (!Array.isArray(cids) || !cids.length) {
 			return callback();
 		}
 		var keys = cids.map(function(cid) {
 			return 'cid:' + cid + ':read_by_uid';
 		});
-		db.setsAdd(keys, uid, callback);
+
+		db.isMemberOfSets(keys, uid, function(err, hasRead) {
+			if (err) {
+				return callback(err);
+			}
+
+			keys = keys.filter(function(key, index) {
+				return !hasRead[index];
+			});
+
+			if (!keys.length) {
+				return callback();
+			}
+
+			db.setsAdd(keys, uid, callback);
+		});
 	};
 
 	Categories.markAsUnreadForAll = function(cid, callback) {

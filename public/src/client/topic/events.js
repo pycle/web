@@ -109,7 +109,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		if (data.tags && data.tags.length !== $('.tags').first().children().length) {
 			templates.parse('partials/post_bar', 'tags', {tags: data.tags}, function(html) {
 				var tags = $('.tags');
-				
+
 				tags.fadeOut(250, function() {
 					tags.html(html).fadeIn(250);
 				});
@@ -121,6 +121,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		$('#post-container li[data-pid="' + pid + '"]').fadeOut(500, function() {
 			$(this).remove();
 		});
+		postTools.updatePostCount();
 	}
 
 	function togglePostDeleteState(data) {
@@ -141,8 +142,6 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 				postEl.find('.post-content').html(data.content);
 			}
 		}
-
-		postTools.updatePostCount();
 	}
 
 	function togglePostFavourite(data) {

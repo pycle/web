@@ -77,11 +77,11 @@ var async = require('async'),
 	};
 
 	Topics.getPageCount = function(tid, uid, callback) {
-		db.sortedSetCard('tid:' + tid + ':posts', function(err, postCount) {
-			if(err) {
+		Topics.getTopicField(tid, 'postcount', function(err, postCount) {
+			if (err) {
 				return callback(err);
 			}
-			if(!parseInt(postCount, 10)) {
+			if (!parseInt(postCount, 10)) {
 				return callback(null, 1);
 			}
 			user.getSettings(uid, function(err, settings) {
@@ -179,7 +179,7 @@ var async = require('async'),
 		Topics.getTopicsData(tids, function(err, topics) {
 			function mapFilter(array, field) {
 				return array.map(function(topic) {
-					return topic && topic[field].toString();
+					return topic && topic[field] && topic[field].toString();
 				}).filter(function(value, index, array) {
 					return utils.isNumber(value) && array.indexOf(value) === index;
 				});
@@ -346,15 +346,22 @@ var async = require('async'),
 	};
 
 	Topics.getTeasers = function(tids, uid, callback) {
-		if(!Array.isArray(tids) || !tids.length) {
+		if (!Array.isArray(tids) || !tids.length) {
 			return callback(null, []);
 		}
 
 		async.parallel({
 			counts: function(next) {
-				async.map(tids, function(tid, next) {
-					db.sortedSetCard('tid:' + tid + ':posts', next);
-				}, next);
+				Topics.getTopicsFields(tids, ['postcount'], function(err, topics) {
+					if (err) {
+						return next(err);
+					}
+					topics = topics.map(function(topic) {
+						return topic && topic.postcount;
+					});
+
+					next(null, topics);
+				});
 			},
 			pids: function(next) {
 				async.map(tids, function(tid, next) {

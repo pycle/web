@@ -148,7 +148,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			var postcount = $('.user_postcount_' + data.posts[i].uid);
 			postcount.html(parseInt(postcount.html(), 10) + 1);
 		}
-		socket.emit('topics.markAsRead', [tid]);
+
 		createNewPosts(data);
 	}
 
@@ -191,7 +191,6 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			postTools.toggle($(this).attr('data-pid'), true);
 		});
 	}
-
 
 	function updateTopicTitle() {
 		if($(window).scrollTop() > 50) {
@@ -439,6 +438,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 				});
 				hidePostToolsForDeletedPosts();
 			} else {
+				socket.emit('topics.markAsRead', [tid]);
 				paginator.update();
 				done();
 			}
