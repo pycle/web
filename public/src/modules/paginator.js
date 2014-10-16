@@ -128,7 +128,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			if (elementInView(el)) {
 				if (typeof paginator.callback === 'function') {
-					var index = parseInt(el.attr('data-index'), 10) + 1;
+					index = parseInt(el.attr('data-index'), 10) + 1;
 					paginator.callback(el, index, count);
 					updateTextAndProgressBar();
 				}
@@ -166,7 +166,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function updateTextAndProgressBar() {
 		index = index > count ? count : index;
-
 		$('#pagination').translateHtml('[[global:pagination.out_of, ' + index + ', ' + count + ']]');
 	}
 
