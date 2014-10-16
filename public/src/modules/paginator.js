@@ -128,7 +128,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			if (elementInView(el)) {
 				if (typeof paginator.callback === 'function') {
-					index = paginator.callback(el, count);
+					var index = parseInt(el.attr('data-index'), 10) + 1;
+					paginator.callback(el, index, count);
 					updateTextAndProgressBar();
 				}
 
@@ -140,7 +141,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	paginator.onScroll = function(cb) {
 		var prevPos = frame.pos.cur;
 
-		frame.on('moveEnd', function(ev) {
+		frame.on('move', function(ev) {
 			var curPos = frame.pos.cur;
 
 			if (prevPos < curPos) {
@@ -154,6 +155,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 			
 			prevPos = curPos;
+			paginator.update();
 		});
 	};
 
@@ -166,7 +168,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		index = index > count ? count : index;
 
 		$('#pagination').translateHtml('[[global:pagination.out_of, ' + index + ', ' + count + ']]');
-		$('.pagination-block .progress-bar').width((index / count * 100) + '%');
 	}
 
 	function elementInView(el) {

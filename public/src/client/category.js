@@ -76,8 +76,8 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 		});
 	};
 
-	Category.navigatorCallback = function(element, elementCount) {
-		return parseInt(element.attr('data-index'), 10) + 1;
+	Category.navigatorCallback = function(element, index, count) {
+		
 	};
 
 	$(window).on('action:popstate', function(ev, data) {
