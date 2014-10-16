@@ -123,7 +123,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	paginator.update = function() {
-		$($(paginator.selector).get().reverse()).each(function() {
+		var elements = $(paginator.selector).get();
+
+		if (index > count / 2) {
+			elements = elements.reverse();
+		}
+
+		$(elements).each(function() {
 			var el = $(this);
 
 			if (elementInView(el)) {
