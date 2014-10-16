@@ -148,8 +148,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	paginator.onScroll = function(cb) {
-		var prevPos = frame.pos.cur,
-			isL;
+		var prevPos = frame.pos.cur;
 
 		frame.on('move', function(ev) {
 			paginator.update();
@@ -176,6 +175,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 			
 			prevPos = curPos;
+		});
+
+		frame.on('moveEnd', function(ev) {
+			
 		});
 	};
 
@@ -254,9 +257,15 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function adjustContentLength() {
 		var items = $(paginator.selector).length,
-			currentHeight = $('#content').height();
+			currentHeight = 0;
 
-		$('#content').css('min-height', (currentHeight / items) * count);
+		$(paginator.selector).each(function() {
+			currentHeight += $(this).outerHeight();
+		});
+
+		var height = ((currentHeight / items) * count) + (count / items * 100);
+
+		$('#content').css('min-height', height);
 
 		paginator.update();
 		paginator.reload();
