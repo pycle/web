@@ -33,7 +33,7 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 		enableInfiniteLoadingOrPagination();
 
 		if (!config.usePagination) {
-			paginator.init('#topics-container > .category-item', ajaxify.variables.get('topic_count'), Category.toTop, Category.toBottom, Category.navigatorCallback);
+			paginator.setup('#topics-container > .category-item', ajaxify.variables.get('topic_count'), Category.toTop, Category.toBottom, Category.navigatorCallback);
 		}
 
 		$('#topics-container').on('click', '.topic-title', function() {
@@ -169,7 +169,7 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 
 	function enableInfiniteLoadingOrPagination() {
 		if (!config.usePagination) {
-			infinitescroll.init(Category.loadMoreTopics);
+			paginator.onScroll(Category.loadMoreTopics);
 		} else {
 			pagination.setup(ajaxify.variables.get('currentPage'), ajaxify.variables.get('pageCount'));
 		}
