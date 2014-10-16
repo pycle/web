@@ -180,7 +180,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 	function enableInfiniteLoadingOrPagination() {
 		if(!config.usePagination) {
-			infinitescroll.init(loadMorePosts, $('#post-container .post-row[data-index="0"]').height());
+			paginator.onScroll(loadMorePosts);
 		} else {
 			pagination.init(parseInt(ajaxify.variables.get('currentPage'), 10), parseInt(ajaxify.variables.get('pageCount'), 10));
 		}
@@ -435,6 +435,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			if (data && data.posts && data.posts.length) {
 				createNewPosts(data, function(postsCreated) {
 					done();
+					paginator.reload();
 				});
 				hidePostToolsForDeletedPosts();
 			} else {

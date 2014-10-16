@@ -118,7 +118,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 
 		$(window).on('scroll', paginator.update);
-
+		paginator.setCount(count);
+		paginator.update();
 	};
 
 	paginator.update = function() {
@@ -133,6 +134,26 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 				return false;
 			}
+		});
+	};
+
+	paginator.onScroll = function(cb) {
+		var prevPos = frame.pos.cur;
+
+		frame.on('moveEnd', function(ev) {
+			var curPos = frame.pos.cur;
+
+			if (prevPos < curPos) {
+				if (elementInView($($(paginator.selector).get(-5)))) {
+					cb(1);
+				}
+			} else if (prevPos > curPos) {
+				if (elementInView($($(paginator.selector).get(5)))) {
+					cb(-1);
+				}
+			}
+			
+			prevPos = curPos;
 		});
 	};
 

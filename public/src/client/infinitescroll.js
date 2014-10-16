@@ -2,7 +2,7 @@
 
 /* globals define, socket, ajaxify, translator, templates, app */
 
-define('forum/infinitescroll', function() {
+define('forum/infinitescroll', ['paginator'], function(paginator) {
 
 	var scroll = {};
 	var callback;
@@ -13,14 +13,14 @@ define('forum/infinitescroll', function() {
 	scroll.init = function(cb, _topOffest) {
 		callback = cb;
 		topOffset = _topOffest || 0;
-		$(window).off('scroll', onScroll).on('scroll', onScroll);
+		//$(window).off('scroll', onScroll).on('scroll', onScroll);
 
 		// if ($(document).height() === $(window).height()) {
 		// 	callback(1);
 		// }
 	};
 
-	function onScroll() {
+	/*function onScroll() {
 		var originalPostEl = $('li[data-index="0"]'),
 			top = $(window).height() * 0.15 + topOffset + (originalPostEl ? originalPostEl.outerHeight() : 0),
 			bottom = ($(document).height() - $(window).height()) * 0.85,
@@ -32,7 +32,7 @@ define('forum/infinitescroll', function() {
 			callback(1);
 		}
 		previousScrollTop = currentScrollTop;
-	}
+	}*/
 
 	scroll.loadMore = function(method, data, callback) {
 		if (loadingMore) {
