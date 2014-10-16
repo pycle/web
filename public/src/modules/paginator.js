@@ -116,10 +116,12 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		toTop = toTop || function() {};
 		toBottom = toBottom || function() {};
 
+		paginator.disableForwardLoading = false;
+		paginator.disableReverseLoading = false;
 
 		$(window).on('scroll', paginator.update);
 		paginator.setCount(count);
-		paginator.update();
+		adjustContentLength(count);
 	};
 
 	paginator.update = function() {
@@ -145,23 +147,34 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	paginator.onScroll = function(cb) {
-		var prevPos = frame.pos.cur;
+		var prevPos = frame.pos.cur,
+			isL;
 
 		frame.on('move', function(ev) {
-			var curPos = frame.pos.cur;
+			paginator.update();
 
-			if (prevPos < curPos) {
+			var curPos = frame.pos.cur,
+				destPos = frame.pos.dest;
+
+			if (curPos === frame.pos.end || destPos === frame.pos.end) {
+				paginator.disableForwardLoading = true;
+			}
+
+			if (curPos === 0 || destPos === 0) {
+				paginator.disableReverseLoading = true;
+			}
+
+			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				if (elementInView($($(paginator.selector).get(-5)))) {
 					cb(1);
 				}
-			} else if (prevPos > curPos) {
+			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
 				if (elementInView($($(paginator.selector).get(5)))) {
 					cb(-1);
 				}
 			}
 			
 			prevPos = curPos;
-			paginator.update();
 		});
 	};
 
@@ -236,6 +249,17 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function showScrollbar() {
 		scrollbar.removeClass('translucent');
+	}
+
+	function adjustContentLength(count) {
+		return;
+		/*var postsPerPage = config.postsPerPage;
+
+			amountLoaded;
+
+		$('#content').css('min-height', po)
+
+		paginator.update();*/
 	}
 
 	return paginator;
