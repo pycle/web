@@ -4,40 +4,14 @@
 
 define('forum/infinitescroll', ['paginator'], function(paginator) {
 
-	var scroll = {};
-	var callback;
-	var previousScrollTop = 0;
-	var loadingMore	= false;
-	var topOffset = 0;
-
-	scroll.init = function(cb, _topOffest) {
-		callback = cb;
-		topOffset = _topOffest || 0;
-		//$(window).off('scroll', onScroll).on('scroll', onScroll);
-
-		// if ($(document).height() === $(window).height()) {
-		// 	callback(1);
-		// }
-	};
-
-	/*function onScroll() {
-		var originalPostEl = $('li[data-index="0"]'),
-			top = $(window).height() * 0.15 + topOffset + (originalPostEl ? originalPostEl.outerHeight() : 0),
-			bottom = ($(document).height() - $(window).height()) * 0.85,
-			currentScrollTop = $(window).scrollTop();
-
-		if(currentScrollTop < top && currentScrollTop < previousScrollTop) {
-			callback(-1);
-		} else if (currentScrollTop > bottom && currentScrollTop > previousScrollTop) {
-			callback(1);
-		}
-		previousScrollTop = currentScrollTop;
-	}*/
+	var scroll = {},
+		loadingMore	= false;
 
 	scroll.loadMore = function(method, data, callback) {
 		if (loadingMore) {
 			return;
 		}
+		
 		loadingMore = true;
 		socket.emit(method, data, function(err, data) {
 			if (err) {
