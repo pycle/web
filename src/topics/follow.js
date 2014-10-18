@@ -3,6 +3,7 @@
 
 var async = require('async'),
 	nconf = require('nconf'),
+	S = require('string'),
 
 	db = require('../database'),
 	user = require('../user'),
@@ -21,8 +22,8 @@ module.exports = function(Topics) {
 		db.getSetMembers('tid:' + tid + ':followers', callback);
 	};
 
-	Topics.notifyFollowers = function(tid, pid, exceptUid) {
-		Topics.getFollowers(tid, function(err, followers) {
+	Topics.notifyFollowers = function(postData, exceptUid) {
+		Topics.getFollowers(postData.topic.tid, function(err, followers) {
 			if (err || !Array.isArray(followers) || !followers.length) {
 				return;
 			}
@@ -36,34 +37,22 @@ module.exports = function(Topics) {
 				return;
 			}
 
-			async.parallel({
-				title: async.apply(Topics.getTopicField, tid, 'title'),
-				username: async.apply(user.getUserField, exceptUid, 'username'),
-				postContent: function(next) {
-					async.waterfall([
-						async.apply(posts.getPostField, pid, 'content'),
-						function(content, next) {
-							postTools.parse(content, next);
-						}
-					], next);
-				}
-			}, function(err, results) {
-				if (err) {
-					return;
-				}
+			var title = postData.topic.title;
+			if (title) {
+				title = S(title).decodeHTMLEntities().s;
+			}
 
-				notifications.create({
-					bodyShort: '[[notifications:user_posted_to, ' + results.username + ', ' + results.title + ']]',
-					bodyLong: results.postContent,
-					pid: pid,
-					nid: 'tid:' + tid + ':pid:' + pid + ':uid:' + exceptUid,
-					tid: tid,
-					from: exceptUid
-				}, function(err, notification) {
-					if (!err && notification) {
-						notifications.push(notification, followers);
-					}
-				});
+			notifications.create({
+				bodyShort: '[[notifications:user_posted_to, ' + postData.user.username + ', ' + title + ']]',
+				bodyLong: postData.content,
+				pid: postData.pid,
+				nid: 'tid:' + postData.topic.tid + ':pid:' + postData.pid + ':uid:' + exceptUid,
+				tid: postData.topic.tid,
+				from: exceptUid
+			}, function(err, notification) {
+				if (!err && notification) {
+					notifications.push(notification, followers);
+				}
 			});
 		});
 	};

@@ -10,9 +10,12 @@ define('forum/topic/browsing', function() {
 
 	Browsing.onUpdateUsersInRoom = function(data) {
 		if(data && data.room.indexOf('topic_' + ajaxify.variables.get('topic_id')) !== -1) {
+			$('.browsing-users').toggleClass('hidden', !data.users.length);
 			for(var i=0; i<data.users.length; ++i) {
 				addUserIcon(data.users[i]);
 			}
+
+			updateUserCount(data.total);
 			getReplyingUsers();
 		}
 	};
@@ -20,10 +23,12 @@ define('forum/topic/browsing', function() {
 	Browsing.onUserEnter = function(data) {
 		var activeEl = $('.thread_active_users');
 		var user = activeEl.find('a[data-uid="' + data.uid + '"]');
-		if (!user.length && activeEl.children().length < 10) {
+		if (!user.length && activeEl.first().children().length < 10) {
 			addUserIcon(data);
-		} else {
+		} else if (user.length) {
 			user.attr('data-count', parseInt(user.attr('data-count'), 10) + 1);
+		} else {
+			increaseUserCount(1);
 		}
 	};
 
@@ -34,8 +39,10 @@ define('forum/topic/browsing', function() {
 			var count = Math.max(0, parseInt(user.attr('data-count'), 10) - 1);
 			user.attr('data-count', count);
 			if (count <= 0) {
-				user.remove();
+				user.parent().remove();
 			}
+		} else {
+			increaseUserCount(-1);
 		}
 	};
 
@@ -68,7 +75,13 @@ define('forum/topic/browsing', function() {
 		}
 		var activeEl = $('.thread_active_users');
 		var userEl = createUserIcon(user.uid, user.picture, user.userslug, user.username);
-		activeEl.append(userEl);
+		var isSelf = parseInt(user.uid, 10) === parseInt(app.uid, 10);
+		if (isSelf) {
+			activeEl.prepend(userEl);
+		} else {
+			activeEl.append(userEl);
+		}
+
 		activeEl.find('a[data-uid] img').tooltip({
 			placement: 'top'
 		});
@@ -89,6 +102,18 @@ define('forum/topic/browsing', function() {
 				}
 			}
 		});
+	}
+
+	function updateUserCount(count) {
+		count = parseInt(count, 10);
+		if (!count || count < 0) {
+			count = 0;
+		}
+		$('.user-count').text(count).parent().toggleClass('hidden', count === 0);
+	}
+
+	function increaseUserCount(incr) {
+		updateUserCount(parseInt($('.user-count').first().text(), 10) + incr);
 	}
 
 	return Browsing;

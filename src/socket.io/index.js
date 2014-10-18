@@ -178,11 +178,10 @@ Sockets.init = function(server) {
 			var socketCount = Sockets.getUserSocketCount(uid);
 			if (uid && socketCount <= 1) {
 				socket.broadcast.emit('event:user_status_change', {uid: uid, status: 'offline'});
+				emitOnlineUserCount();
 			}
 
 			onUserDisconnect(uid, socket.id, socketCount);
-
-			emitOnlineUserCount();
 
 			for(var roomName in io.sockets.manager.roomClients[socket.id]) {
 				if (roomName.indexOf('topic') !== -1) {
@@ -287,14 +286,7 @@ Sockets.getUserSocketCount = function(uid) {
 };
 
 Sockets.getOnlineUserCount = function () {
-	var roomNames = Object.keys(io.sockets.manager.rooms);
-	if (!Array.isArray(roomNames)) {
-		return 0;
-	}
-	roomNames = roomNames.filter(function(name) {
-		return name.indexOf('/uid_') === 0;
-	});
-	return roomNames.length;
+	return onlineUsers.length;
 };
 
 Sockets.getOnlineAnonCount = function () {
@@ -377,6 +369,7 @@ function updateRoomBrowsingText(roomName, selfUid) {
 	}
 
 	var	uids = Sockets.getUidsInRoom(roomName);
+	var total = uids.length;
 	uids = uids.slice(0, 9);
 	if (selfUid) {
 		uids = [selfUid].concat(uids);
@@ -385,16 +378,19 @@ function updateRoomBrowsingText(roomName, selfUid) {
 		return;
 	}
 	user.getMultipleUserFields(uids, ['uid', 'username', 'userslug', 'picture', 'status'], function(err, users) {
-		if(!err) {
-			users = users.filter(function(user) {
-				return user.status !== 'offline';
-			});
-
-			io.sockets.in(roomName).emit('event:update_users_in_room', {
-				users: users,
-				room: roomName
-			});
+		if (err) {
+			return;
 		}
+
+		users = users.filter(function(user) {
+			return user && user.status !== 'offline';
+		});
+
+		io.sockets.in(roomName).emit('event:update_users_in_room', {
+			users: users,
+			room: roomName,
+			total: Math.max(0, total - uids.length)
+		});
 	});
 }
 
@@ -433,7 +429,7 @@ function emitTopicPostStats(callback) {
 		};
 
 		if (!callback) {
-			io.sockets.emit('meta.getUsageStats', null, stats);
+			io.sockets.in('online_users').emit('meta.getUsageStats', null, stats);
 		} else {
 			callback(null, stats);
 		}
@@ -453,7 +449,7 @@ function emitOnlineUserCount(callback) {
 	if (callback) {
 		callback(null, returnObj);
 	} else {
-		io.sockets.emit('user.getActiveUsers', null, returnObj);
+		io.sockets.in('online_users').emit('user.getActiveUsers', null, returnObj);
 	}
 }
 
