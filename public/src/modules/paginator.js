@@ -7,7 +7,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		frame,
 		scrollbar,
 		animationTimeout = null,
-		index,
+		index, previousIndex,
 		count;
 	
 	paginator.init = function() {
@@ -126,8 +126,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		adjustContentLength();
 	};
 
-	var previousIndex = 0; // update this to the actual current position
-
 	paginator.update = function() {
 		var elements = $(paginator.selector).get();
 
@@ -141,9 +139,14 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			if (elementInView(el)) {
 				if (typeof paginator.callback === 'function') {
 					index = parseInt(el.attr('data-index'), 10) + 1;
-					if (Math.abs(index - previousIndex) > 1) {
-						index = previousIndex + ((index - previousIndex) / Math.abs(index - previousIndex));
+					if (previousIndex && !paginator.scrollActive) {
+						var abs = Math.abs(index - previousIndex);
+
+						if (abs > 1) {
+							index = previousIndex + ((index - previousIndex) / abs);
+						}
 					}
+
 					previousIndex = index;
 					paginator.callback(el, index, count);
 					updateTextAndProgressBar();
