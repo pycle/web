@@ -273,7 +273,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			currentHeight += $(this).outerHeight();
 		});
 
-		var height = ((currentHeight / items) * count) + (count / items * 100);
+		var height = ((currentHeight / items) * count) + (count / items * 1000);
 
 		$('#content').css('min-height', height);
 
