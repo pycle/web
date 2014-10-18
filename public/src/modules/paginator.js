@@ -262,6 +262,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	}
 
 	function showScrollbar() {
+		clearTimeout(animationTimeout);
 		scrollbar.removeClass('translucent');
 	}
 
