@@ -109,6 +109,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		}
 	};
 
+	//look into calculateIndex
 	paginator.setup = function(selector, count, toTop, toBottom, callback, calculateIndex) {
 		index = 1;
 		paginator.selector = selector;
@@ -125,6 +126,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		adjustContentLength();
 	};
 
+	var previousIndex = 0; // update this to the actual current position
+
 	paginator.update = function() {
 		var elements = $(paginator.selector).get();
 
@@ -138,6 +141,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			if (elementInView(el)) {
 				if (typeof paginator.callback === 'function') {
 					index = parseInt(el.attr('data-index'), 10) + 1;
+					if (Math.abs(index - previousIndex) > 1) {
+						index = previousIndex + ((index - previousIndex) / Math.abs(index - previousIndex));
+					}
+					previousIndex = index;
 					paginator.callback(el, index, count);
 					updateTextAndProgressBar();
 				}
