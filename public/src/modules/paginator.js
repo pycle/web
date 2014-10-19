@@ -32,9 +32,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		//todo key-bindings
 
-		$(window).on('resize action:ajaxify.end', function() {
-			paginator.reload();
-		});
+		$(window).on('resize action:ajaxify.end', adjustContentLength);
 
 		frame.on('moveEnd', hideScrollbar);
 		scrollbar.on('mouseout', hideScrollbar);
@@ -268,15 +266,16 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function adjustContentLength() {
 		var items = $(paginator.selector).length,
+			content = $('#content'),
 			currentHeight = 0;
 
 		$(paginator.selector).each(function() {
 			currentHeight += $(this).outerHeight();
 		});
 
-		var height = ((currentHeight / items) * count) + (count / items * 1000);
+		var height = items !== count ? ((currentHeight / items) * count) + (count / items * 1000) : content.height();
 
-		$('#content').css('min-height', height);
+		content.css('min-height', height);
 
 		paginator.update();
 		paginator.reload();
