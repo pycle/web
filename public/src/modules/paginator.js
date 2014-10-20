@@ -157,7 +157,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	paginator.onScroll = function(cb) {
 		var prevPos = frame.pos.cur;
-
+		
 		frame.on('move', function(ev) {
 			paginator.update();
 
@@ -174,11 +174,24 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				if (elementInView($($(paginator.selector).get(-5)))) {
-					cb(1, adjustContentLength);
+					cb(1, function() {
+						var page = Math.ceil(index / config.postsPerPage);
+
+						$('.infinite-spacer[data-page="' + page + '"]').remove();
+						adjustContentLength();
+					});
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
-				if (elementInView($($(paginator.selector).get(5)))) {
-					cb(-1, adjustContentLength);
+				var el = $($(paginator.selector).get(10));
+				if (elementInView(el)) {
+					cb(-1, function() {
+						//var page = Math.floor(index / config.postsPerPage) - 1; // the minus 1 is wrong, it's only there because we're starting too early, need to fix.
+
+						//$('.infinite-spacer[data-page="' + page + '"]').remove();
+						console.log(el.prevAll('.infinite-spacer').first().length);
+						el.prevAll('.infinite-spacer').first().remove();
+						adjustContentLength();
+					});
 				}
 			}
 			
@@ -269,13 +282,37 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			content = $('#content'),
 			currentHeight = 0;
 
+		var spacer = $('<div class="infinite-spacer"></div>')
+			lastIndex = 0;
+
 		$(paginator.selector).each(function() {
-			currentHeight += $(this).outerHeight();
+			var el = $(this),
+				index = parseInt(el.attr('data-index'), 10);
+
+			if ((lastIndex + 1) !== index && index !== 0) {
+				var amountOfPages = Math.ceil((index - lastIndex) / config.postsPerPage);
+
+				for (var x = amountOfPages; x > 0; x--) {
+					var page = Math.ceil(index / config.postsPerPage) - x;
+
+					if (!$('.infinite-spacer[data-page="' + page + '"]').length) {
+						spacer.clone()
+							.attr('data-page', page)
+							.insertBefore(el);
+					}
+				}
+			}
+
+			lastIndex = index;
+
+			currentHeight += el.outerHeight();
 		});
 
-		var height = items !== count ? ((currentHeight / items) * count) + (count / items * 1000) : content.height();
+		var height = items !== count ? ((currentHeight / items) * count) + (count / items * 1000) : content.height(),
+			spacerHeight = height / items + (count / items * 1000);
 
-		content.css('min-height', height);
+		content.css('min-height', height - ($('.infinite-spacer').length * spacerHeight));
+		$('.infinite-spacer').height(spacerHeight);
 
 		paginator.update();
 		paginator.reload();
