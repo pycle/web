@@ -108,7 +108,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	//look into calculateIndex
-	paginator.setup = function(selector, count, toTop, toBottom, callback, calculateIndex) {
+	paginator.setup = function(selector, count, toTop, toBottom, callback, calculateIndex, onFinishedSetup) {
 		index = 1;
 		paginator.selector = selector;
 		paginator.callback = callback;
@@ -118,10 +118,15 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		paginator.disableForwardLoading = false;
 		paginator.disableReverseLoading = false;
 
-		$(window).on('scroll', paginator.update);
 		paginator.setCount(count);
 
 		adjustContentLength();
+
+		if (typeof onFinishedSetup === 'function') {
+			onFinishedSetup();
+		}
+
+		$(window).on('scroll', paginator.update);
 	};
 
 	paginator.update = function() {
