@@ -162,7 +162,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			paginator.update();
 
 			var curPos = frame.pos.cur,
-				destPos = frame.pos.dest;
+				destPos = frame.pos.dest,
+				el;
 
 			if (curPos === frame.pos.end || destPos === frame.pos.end) {
 				paginator.disableForwardLoading = true;
@@ -173,22 +174,17 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
-				if (elementInView($($(paginator.selector).get(-5)))) {
+				el = $($(paginator.selector).get(-10));
+				if (elementInView(el)) {
 					cb(1, function() {
-						var page = Math.ceil(index / config.postsPerPage);
-
-						$('.infinite-spacer[data-page="' + page + '"]').remove();
+						el.nextAll('.infinite-spacer').first().remove();
 						adjustContentLength();
 					});
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
-				var el = $($(paginator.selector).get(10));
+				el = $($(paginator.selector).get(10));
 				if (elementInView(el)) {
 					cb(-1, function() {
-						//var page = Math.floor(index / config.postsPerPage) - 1; // the minus 1 is wrong, it's only there because we're starting too early, need to fix.
-
-						//$('.infinite-spacer[data-page="' + page + '"]').remove();
-						console.log(el.prevAll('.infinite-spacer').first().length);
 						el.prevAll('.infinite-spacer').first().remove();
 						adjustContentLength();
 					});
@@ -282,7 +278,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			content = $('#content'),
 			currentHeight = 0;
 
-		var spacer = $('<div class="infinite-spacer"></div>')
+		var spacer = $('<div class="infinite-spacer"></div>'),
 			lastIndex = 0;
 
 		$(paginator.selector).each(function() {
