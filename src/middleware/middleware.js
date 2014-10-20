@@ -363,7 +363,7 @@ middleware.renderHeader = function(req, res, callback) {
 			},
 			user: function(next) {
 				if (uid) {
-					user.getUserFields(uid, ['username', 'userslug', 'picture', 'status'], next);
+					user.getUserFields(uid, ['username', 'userslug', 'picture', 'status', 'banned'], next);
 				} else {
 					next();
 				}
@@ -373,12 +373,18 @@ middleware.renderHeader = function(req, res, callback) {
 				return callback(err);
 			}
 
+			if (results.user && parseInt(results.user.banned, 10) === 1) {
+				req.logout();
+				res.redirect('/');
+				return;
+			}
+
 			templateValues.browserTitle = results.title;
 			templateValues.isAdmin = results.isAdmin || false;
 			templateValues.user = results.user;
 			templateValues.customCSS = results.customCSS;
 			templateValues.customJS = results.customJS;
-			templateValues.maintenanceHeader = meta.config.maintenanceMode === '1' && !results.isAdmin;
+			templateValues.maintenanceHeader = parseInt(meta.config.maintenanceMode, 10) === 1 && !results.isAdmin;
 
 			app.render('header', templateValues, callback);
 		});

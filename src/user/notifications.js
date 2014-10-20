@@ -186,7 +186,7 @@ var async = require('async'),
 				return callback(null, []);
 			}
 
-			UserNotifications.getNotifications(nids, uid);
+			UserNotifications.getNotifications(nids, uid, callback);
 		});
 	};
 
@@ -250,7 +250,7 @@ var async = require('async'),
 					bodyShort: '[[notifications:user_posted_topic, ' + postData.user.username + ', ' + title + ']]',
 					bodyLong: postData.content,
 					pid: postData.pid,
-					nid: 'tid:' + postData.tid + ':pid:' + postData.pid + ':uid:' + uid,
+					nid: 'tid:' + postData.tid + ':uid:' + uid,
 					tid: postData.tid,
 					from: uid
 				}, function(err, notification) {

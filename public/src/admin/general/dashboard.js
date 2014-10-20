@@ -20,7 +20,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 			if (app.isFocused && app.isConnected) {
 				socket.emit('meta.rooms.getAll', Admin.updateRoomUsage);
 			}
-		}, 5000);
+		}, 10000);
 
 		$(window).on('action:ajaxify.start', function(ev, data) {
 			clearInterval(intervals.rooms);
@@ -293,7 +293,9 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 		graphs.topics = new Chart(topicsCtx).Doughnut([], {responsive: true});
 		topicsCanvas.onclick = function(evt){
 			var obj = graphs.topics.getSegmentsAtEvent(evt);
-			window.open(RELATIVE_PATH + '/topic/' + obj[0].tid);
+			if (obj && obj[0]) {
+				window.open(RELATIVE_PATH + '/topic/' + obj[0].tid);
+			}
 		};
 
 		intervals.graphs = setInterval(updateTrafficGraph, 15000);
@@ -316,7 +318,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 	}
 
 	function updateTrafficGraph() {
-		if (!app.isFocused  || !app.isConnected) {
+		if (!app.isFocused) {
 			return;
 		}
 
@@ -367,7 +369,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 				var tid = segments[i].tid;
 
 				if ($.inArray(tid, tids) === -1) {
-					usedTopicColors.splice($.inArray(segments[i].color, usedTopicColors), 1);
+					usedTopicColors.splice($.inArray(segments[i].fillColor, usedTopicColors), 1);
 					graphs.topics.removeData(i);
 				} else {
 					graphs.topics.segments[i].value = topics[tid].value;
