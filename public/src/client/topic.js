@@ -60,9 +60,9 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 		addBlockquoteEllipses($('.topic .post-content > blockquote'));
 
-		paginator.setup('.posts > .post-row', postCount, Topic.toTop, Topic.toBottom, Topic.navigatorCallback, Topic.calculateIndex, function() {
-			handleBookmark(tid);	
-		});
+		handleBookmark(tid);
+		paginator.setup('.posts > .post-row', postCount, Topic.toTop, Topic.toBottom, Topic.navigatorCallback, Topic.calculateIndex);
+		handleBookmark(tid);
 
 		socket.on('event:new_post', onNewPost);
 		socket.on('event:new_notification', onNewNotification);
