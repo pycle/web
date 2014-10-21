@@ -156,6 +156,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 		});
 
+		// might be best to only call this on new post
 		updateScrollbar();
 	};
 
@@ -187,7 +188,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				el = $($(paginator.selector).get(-10));
-				if (elementInView(el, 1)) {
+				
+				if (parseInt(el.attr('data-index'), 10) < index) {
 					startLoadingAt = el.nextAll('[data-index]').last();
 					startLoadingAt = startLoadingAt.attr('data-index');
 					page = Math.ceil(startLoadingAt / config.postsPerPage);
@@ -199,7 +201,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
 				el = $($(paginator.selector).get(10));
-				if (elementInView(el, -1)) {
+				
+				if (parseInt(el.attr('data-index'), 10) > index) {
 					startLoadingAt = (el.prevAll().not(paginator.selector)).first().next();
 					startLoadingAt = startLoadingAt.attr('data-index') - config.postsPerPage;
 
