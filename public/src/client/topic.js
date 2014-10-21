@@ -335,8 +335,10 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			return callback(false);
 		}
 
-		if (data.appendToEnd) {
+		if (data.direction === 1) {
 			after = $('#post-container li.post-row[data-index!="0"]').last();
+		} else if (data.direction === -1) {
+			before = $('#post-container li.post-row[data-index!="0"]').first();
 		} else {
 			findInsertionPoint();
 		}
@@ -439,10 +441,10 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 		var reverse = config.topicPostSort === 'newest_to_oldest' || config.topicPostSort === 'most_votes';
 
-		loadPostsAfter(after, callback);
+		loadPostsAfter(after, direction, callback);
 	}
 
-	function loadPostsAfter(after, callback) {
+	function loadPostsAfter(after, direction, callback) {
 		var tid = ajaxify.variables.get('topic_id');
 		if (!utils.isNumber(tid) || !utils.isNumber(after) || (after === 0 && $('#post-container li.post-row[data-index="1"]').length)) {
 			return;
@@ -458,7 +460,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			after: after
 		}, function (data, done) {
 			indicatorEl.fadeOut();
-			data.appendToEnd = true;
+			data.direction = direction;
 
 			if (data && data.posts && data.posts.length) {
 				createNewPosts(data, function(postsCreated) {
