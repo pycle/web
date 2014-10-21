@@ -124,7 +124,14 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		adjustContentLength();
 	};
 
+	var throttle = Date.now();
 	paginator.update = function() {
+		if ((Date.now() - throttle) < 2000) {
+			return;
+		}
+
+		throttle = Date.now();
+
 		var elements = $(paginator.selector).get();
 
 		if (index > count / 2) {
@@ -156,9 +163,16 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	paginator.onScroll = function(cb) {
-		var prevPos = frame.pos.cur;
+		var prevPos = frame.pos.cur,
+			throttle = Date.now();
 		
 		frame.on('move', function(ev) {
+			if ((Date.now() - throttle) < 250) {
+				return;
+			}
+
+			throttle = Date.now();
+
 			paginator.update();
 
 			var curPos = frame.pos.cur,
