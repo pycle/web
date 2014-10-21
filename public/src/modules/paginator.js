@@ -160,17 +160,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		updateScrollbar();
 	};
 
-	var throttle = Date.now();
-
 	paginator.onScroll = function(cb) {
 		var prevPos = frame.pos.cur;
 		
 		frame.on('move', function(ev) {
-			if ((Date.now() - throttle) < 150) {
-				return;
-			}
-
-			throttle = Date.now();
 
 			paginator.update();
 
