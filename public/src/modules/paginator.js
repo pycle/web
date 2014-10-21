@@ -206,12 +206,14 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					startLoadingAt = startLoadingAt > 0 ? startLoadingAt : 0;
 					page = Math.floor(startLoadingAt / config.postsPerPage);
 
-					var originalSize;
+					var originalSize = $('#content').height();
 
 					cb(-1, startLoadingAt, function() {
-						frame.slideBy($('#content').height() - originalSize, true);
+						var slide = $('#content').height() - originalSize;						
 						paginator.update();
 						paginator.reload();
+
+						frame.slideBy(slide, true);	
 					});
 				}
 			}
