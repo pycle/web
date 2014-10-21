@@ -7,14 +7,18 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		frame,
 		content,
 		scrollbar,
+		handle,
 		animationTimeout = null,
 		index,
 		count;
+
+	
 	
 	paginator.init = function() {
 		frame = $('#frame');
 		content = $('#content');
 		scrollbar = $('#scrollbar');
+		handle = scrollbar.find('.handle');
 
 		$(window).on('resize action:ajaxify.end', function() {
 			paginator.update();
@@ -139,6 +143,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		updateScrollbar();
 	};
 
+
 	paginator.onScroll = function(cb) {
 		var prevPos = frame.scrollTop();
 		
@@ -188,21 +193,21 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			prevPos = curPos;
 		});
 	};
-
+	
 	function updateScrollbar() {
-		var paddingTop = 60,
-			paddingBottom = 10,
-
+		var frameHeight = frame.height(),
 			heightPerElement = content.height() / $(paginator.selector).length,
-			areaMissingAtBottom = (count - parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10)) * heightPerElement,
-			areaMissingAtTop = parseInt($($(paginator.selector).get(1)).attr('data-index'), 10) * heightPerElement,
-
 			totalArea = count * heightPerElement,
-			scrollbarBottom = Math.max((areaMissingAtBottom / totalArea * frame.height()), paddingBottom),
-			scrollbarTop = Math.max((areaMissingAtTop / totalArea * frame.height()), paddingTop);
 
-		$('#scrollbar').css('bottom', scrollbarBottom + 'px');
-		$('#scrollbar').css('top', scrollbarTop + 'px');
+			areaMissingAtTop = (parseInt($($(paginator.selector).get(1)).attr('data-index'), 10) - 1) * heightPerElement,
+			scrolledRatio = frame.scrollTop() / totalArea,
+			handleTop = Math.min(scrolledRatio * (frameHeight - handle.height() / 2) + areaMissingAtTop / totalArea * frameHeight, frameHeight - handle.height());
+
+		handle.css({
+			'transform': 'translate3d(0,' + handleTop + 'px, 0)',
+			'-moz-transform': 'translate3d(0,' + handleTop + 'px, 0)',
+			'-o-transform': 'translate3d(0,' + handleTop + 'px, 0)'
+		});
 	}
 
 	function generateUrl(index) {
