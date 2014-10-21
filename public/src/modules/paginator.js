@@ -175,7 +175,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			paginator.update();
 
 			var curPos = frame.pos.cur,
-				el, startLoadingAt, page;
+				el, startLoadingAt;
 
 			//if (curPos === frame.pos.end || destPos === frame.pos.end) {
 			if (!paginator.disableForwardLoading && parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10) === count) {
@@ -192,7 +192,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				if (parseInt(el.attr('data-index'), 10) < index) {
 					startLoadingAt = el.nextAll('[data-index]').last();
 					startLoadingAt = startLoadingAt.attr('data-index');
-					page = Math.ceil(startLoadingAt / config.postsPerPage);
 
 					cb(1, startLoadingAt, function() {
 						paginator.update();
@@ -205,9 +204,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				if (parseInt(el.attr('data-index'), 10) > index) {
 					startLoadingAt = (el.prevAll().not(paginator.selector)).first().next();
 					startLoadingAt = startLoadingAt.attr('data-index') - config.postsPerPage;
-
 					startLoadingAt = startLoadingAt > 0 ? startLoadingAt : 0;
-					page = Math.floor(startLoadingAt / config.postsPerPage);
 
 					var originalSize = $('#content').height();
 
