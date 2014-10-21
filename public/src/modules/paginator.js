@@ -30,9 +30,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		scrollbar.on('mouseout', hideScrollbar);
 		scrollbar.on('mouseover', showScrollbar);
 
-		handle.on('mousedown', activatePagination);
-		$('body').on('mouseup', deactivatePagination);
-		$('body').on('mousemove', paginate);
+		handle.on('mousedown touchstart', activatePagination);
+		$('body').on('mouseup touchend', deactivatePagination);
+		$('body').on('mousemove touchmove', paginate);
 
 		frame.on('scroll', function() {
 			showScrollbar();
@@ -319,7 +319,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		var pindex = (page * config.postsPerPage) + 1;
 		pindex = pindex > count ? count : pindex;
-		console.log(pindex);
 		paginator.scrollToPost(pindex);
 	}
 
@@ -328,11 +327,15 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			return;
 		}
 
-		if (ev.which !== 1) {
+		var touches = window.event.touches;
+
+		if (!touches && ev.which !== 1) {
 			return deactivatePagination();
 		}
 
-		var mousePos = ev.pageY - scrollbar.offset().top - (handle.height() / 2);
+		var mouseY = touches ? touches[0].clientY : ev.pageY;
+
+		var mousePos = mouseY - scrollbar.offset().top - (handle.height() / 2);
 		snapHandleToPage(mousePos);
 	}
 
@@ -341,7 +344,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			pixelsPerPage = (frame.height() - handle.height()) / numPages,
 			nearestPoint = Math.round(mousePos / pixelsPerPage) * pixelsPerPage;
 
-		page = nearestPoint / pixelsPerPage;
+		page = parseInt(nearestPoint / pixelsPerPage, 10);
 
 		moveHandle(nearestPoint);
 		$('#pagination').translateHtml('[[global:pagination.page_out_of, ' + page + ', ' + numPages + ']]');
