@@ -184,7 +184,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				if (elementInView(el)) {
 					//do this only if using scrollbar
 					frame.set('scrollBy', 0);
-					cb(1, function() {
+					cb(1, el.nextAll().last().attr('data-index'), function() {
 						frame.set('scrollBy', 200);
 						el.nextAll('.infinite-spacer').first().remove();
 						adjustContentLength();
@@ -195,7 +195,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				if (elementInView(el)) {
 					//do this only if using scrollbar
 					frame.set('scrollBy', 0);
-					cb(-1, function() {
+					var el = (el.prevAll().not(paginator.selector)).first().next(),
+						startLoadingAt = el.attr('data-index') - config.postsPerPage;
+
+					cb(-1, startLoadingAt > 0 ? startLoadingAt : 0, function() {
 						frame.set('scrollBy', 200);
 						el.prevAll('.infinite-spacer').first().remove();
 						adjustContentLength();

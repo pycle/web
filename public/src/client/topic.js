@@ -414,16 +414,14 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		postEl.find('.chat, .flag').toggleClass('hidden', isSelfPost || !app.uid);
 	}
 
-	function loadMorePosts(direction, callback) {
+	function loadMorePosts(direction, after, callback) {
 		if (!$('#post-container').length || paginator.scrollActive) {
 			return;
 		}
 
 		var reverse = config.topicPostSort === 'newest_to_oldest' || config.topicPostSort === 'most_votes';
 
-		infinitescroll.calculateAfter(direction, '#post-container .post-row[data-index!="0"]', config.postsPerPage, reverse, function(after, offset, el) {
-			loadPostsAfter(after, callback);
-		});
+		loadPostsAfter(after, callback);
 	}
 
 	function loadPostsAfter(after, callback) {

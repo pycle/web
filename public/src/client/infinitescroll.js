@@ -32,33 +32,5 @@ define('forum/infinitescroll', ['paginator'], function(paginator) {
 		});
 	};
 
-	scroll.calculateAfter = function(direction, selector, count, reverse, callback) {
-		var after = 0,
-			offset = 0,
-			el = direction > 0 ? $(selector).last() : $(selector).first(),
-			increment;
-
-		count = reverse ? -count : count;
-		increment = reverse ? -1 : 1;
-
-		if (direction > 0) {
-			after = parseInt(el.attr('data-index'), 10) + increment;
-		} else {
-			after = parseInt(el.attr('data-index'), 10);
-			if (isNaN(after)) {
-				after = 0;
-			}
-			after -= count;
-			if (after < 0) {
-				after = 0;
-			}
-			if (el && el.offset()) {
-				offset = el.offset().top - $('#header-menu').offset().top + $('#header-menu').height();
-			}
-		}
-
-		callback(after, offset, el);
-	};
-
 	return scroll;
 });
