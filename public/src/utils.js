@@ -1,7 +1,7 @@
 (function(module) {
 	'use strict';
 
-	var utils, fs, XRegExp;
+	var utils, fs, XRegExp, cache = {};
 
 	if ('undefined' === typeof window) {
 		fs = require('fs');
@@ -251,6 +251,11 @@
 
 		escapeRegexChars: function(text) {
 			return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+		},
+
+		isMobile: function() {
+			cache.isMobile = cache.isMobile || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+			return cache.isMobile;
 		},
 
 		isAndroidBrowser: function() {
