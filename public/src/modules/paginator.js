@@ -182,10 +182,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				el = $($(paginator.selector).get(-10));
 				if (elementInView(el)) {
-					startLoadingAt = el.nextAll().last();
+					startLoadingAt = el.nextAll('[data-index]').last();
 					startLoadingAt = startLoadingAt.attr('data-index');
-					page = Math.floor(startLoadingAt / config.postsPerPage);
-
+					page = Math.ceil(startLoadingAt / config.postsPerPage);
 					//frame.set('scrollBy', 0);
 					cb(1, startLoadingAt, function() {
 						//frame.set('scrollBy', 200);
@@ -325,12 +324,33 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			currentHeight += el.outerHeight();
 		});
+		function temp() {
+			var el = $($(paginator.selector).get(-1)),
+				index = el.attr('data-index');
+
+			if (index !== count) {
+				var amountOfPages = Math.ceil((count - index) / config.postsPerPage);
+
+				for (var x = 0; x < amountOfPages; x++) {
+					var page = Math.ceil(index / config.postsPerPage) + x;
+
+					if (!$('.infinite-spacer[data-page="' + page + '"]').length) {
+						spacer.clone()
+							.attr('data-page', page)
+							.insertAfter(el);
+					}
+				}
+			}	
+		}
+
+		temp();
+		
 
 		var height = items !== count ? ((currentHeight / items) * count) + (count / items * 1000) : content.height(),
 			spacerHeight = height / items + (count / items * 1000),
 			contentHeight = height - ($('.infinite-spacer').length * spacerHeight);
 
-		content.css('min-height', !$(paginator.selector + '[data-index="' + count + '"]').length ? contentHeight : 0);
+		//content.css('min-height', !$(paginator.selector + '[data-index="' + count + '"]').length ? contentHeight : 0);
 		$('.infinite-spacer').height(spacerHeight);
 
 		paginator.update();
