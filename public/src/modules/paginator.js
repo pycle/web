@@ -169,7 +169,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			var curPos = frame.pos.cur,
 				destPos = frame.pos.dest,
-				el;
+				el, startLoadingAt, page;
 
 			if (curPos === frame.pos.end || destPos === frame.pos.end) {
 				paginator.disableForwardLoading = true;
@@ -182,25 +182,31 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				el = $($(paginator.selector).get(-10));
 				if (elementInView(el)) {
-					//do this only if using scrollbar
+					startLoadingAt = el.nextAll().last();
+					startLoadingAt = startLoadingAt.attr('data-index');
+					page = Math.floor(startLoadingAt / config.postsPerPage);
+
 					//frame.set('scrollBy', 0);
-					cb(1, el.nextAll().last().attr('data-index'), function() {
+					cb(1, startLoadingAt, function() {
 						//frame.set('scrollBy', 200);
-						el.nextAll('.infinite-spacer').first().remove();
+						$('.infinite-spacer[data-page="' + page + '"]').remove();
 						adjustContentLength();
 					});
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
 				el = $($(paginator.selector).get(10));
 				if (elementInView(el)) {
-					//do this only if using scrollbar
-					//frame.set('scrollBy', 0);
-					var el = (el.prevAll().not(paginator.selector)).first().next(),
-						startLoadingAt = el.attr('data-index') - config.postsPerPage;
+					startLoadingAt = (el.prevAll().not(paginator.selector)).first().next();
+					startLoadingAt = startLoadingAt.attr('data-index') - config.postsPerPage;
 
-					cb(-1, startLoadingAt > 0 ? startLoadingAt : 0, function() {
-						//frame.set('scrollBy', 200);
-						el.prevAll('.infinite-spacer').first().remove();
+					startLoadingAt = startLoadingAt > 0 ? startLoadingAt : 0;
+					page = Math.floor(startLoadingAt / config.postsPerPage);
+
+					var originalSize;
+
+					cb(-1, startLoadingAt, function() {
+						frame.slideBy($('#content').height() - originalSize, true);
+						$('.infinite-spacer[data-page="' + page + '"]').remove();
 						adjustContentLength();
 					});
 				}
@@ -210,7 +216,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		});
 
 		frame.on('moveEnd', function(ev) {
-			//paginator.callback(index, count);
+
 		});
 	};
 
@@ -321,10 +327,11 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		});
 
 		var height = items !== count ? ((currentHeight / items) * count) + (count / items * 1000) : content.height(),
-			spacerHeight = height / items + (count / items * 1000);
+			spacerHeight = height / items + (count / items * 1000),
+			contentHeight = height - ($('.infinite-spacer').length * spacerHeight);
 
-		content.css('min-height', height - ($('.infinite-spacer').length * spacerHeight));
-		$('.infinite-spacer').height((index + config.postsPerPage) > count ? spacerHeight : 0);
+		content.css('min-height', !$(paginator.selector + '[data-index="' + count + '"]').length ? contentHeight : 0);
+		$('.infinite-spacer').height(spacerHeight);
 
 		paginator.update();
 		paginator.reload();

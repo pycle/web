@@ -362,6 +362,13 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 			addBlockquoteEllipses(html.find('.post-content > blockquote'));
 
+			$('.post-content').each(function() {
+				if (!$(this).attr('derp')) {
+					$(this).attr('derp', true);
+					$(this).before('<strong>' + $(this).parents('[data-index]').attr('data-index') + '</strong>');
+				}
+			})
+
 			$(window).trigger('action:posts.loaded');
 			onNewPostsLoaded(html, data.posts);
 			callback(true);
