@@ -26,7 +26,6 @@ module.exports = function(Meta) {
 			base: [
 				'public/vendor/jquery/js/jquery.js',
 				'public/vendor/jquery/js/jquery-ui-1.10.4.custom.js',
-				'public/vendor/jquery/jquery.easing.js',
 				'./node_modules/socket.io-client/dist/socket.io.js',
 				'public/vendor/jquery/timeago/jquery.timeago.min.js',
 				'public/vendor/jquery/js/jquery.form.min.js',
@@ -40,7 +39,6 @@ module.exports = function(Meta) {
 				'public/vendor/xregexp/unicode/unicode-base.js',
 				'public/vendor/buzz/buzz.min.js',
 				'public/vendor/mousetrap/mousetrap.js',
-				'public/vendor/sly/sly.js',
 				'./node_modules/templates.js/lib/templates.js',
 				'public/src/utils.js',
 				'public/src/app.js',
