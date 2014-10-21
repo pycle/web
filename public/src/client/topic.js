@@ -435,7 +435,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 	}
 
 	function loadMorePosts(direction, after, callback) {
-		if (!$('#post-container').length || paginator.scrollActive) {
+		if (!$('#post-container').length) {
 			return;
 		}
 

@@ -3,13 +3,16 @@
 /* globals app, define, utils, config, ajaxify, Sly */
 
 define('paginator', ['forum/pagination'], function(pagination) {
-	var paginator = {},
+	var paginator = {
+			active: false
+		},
 		frame,
 		content,
 		scrollbar,
 		handle,
 		animationTimeout = null,
 		index,
+		page,
 		count;
 
 	
@@ -27,6 +30,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		scrollbar.on('mouseout', hideScrollbar);
 		scrollbar.on('mouseover', showScrollbar);
 
+		handle.on('mousedown', activatePagination);
+		$('body').on('mouseup', deactivatePagination);
+		$('body').on('mousemove', paginate);
+
 		frame.on('scroll', function() {
 			showScrollbar();
 			hideScrollbar();
@@ -35,6 +42,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		hideScrollbar();
 	};
 
+	// offset and duration deprecated
 	paginator.scrollToPost = function(postIndex, highlight, duration, offset) {
 		if (!utils.isNumber(postIndex)) {
 			return;
@@ -193,7 +201,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			prevPos = curPos;
 		});
 	};
-	
+
 	function updateScrollbar() {
 		var frameHeight = frame.height(),
 			heightPerElement = content.height() / $(paginator.selector).length,
@@ -249,7 +257,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		var done = false;
 		function animateScroll() {
 			$('#frame').animate({
-				scrollTop: (scrollTo.offset().top - $('#header-menu').height() - offset) + 'px'
+				scrollTop: (scrollTo.offset().top - content.offset().top - offset) + 'px'
 			}, duration, function() {
 				if (done) {
 					return;
@@ -281,6 +289,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	}
 
 	function hideScrollbar() {
+		if (paginator.active) {
+			return;
+		}
+
 		clearTimeout(animationTimeout);
 		animationTimeout = setTimeout(function() {
 			scrollbar.addClass('translucent');
@@ -291,6 +303,56 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	function showScrollbar() {
 		clearTimeout(animationTimeout);
 		scrollbar.removeClass('translucent');
+	}
+
+	function activatePagination() {
+		$('body').addClass('paginating');
+		paginator.active = true;
+		showScrollbar();
+	}
+
+	function deactivatePagination() {
+		$('body').removeClass('paginating');
+		paginator.active = false;
+		hideScrollbar();
+		updateTextAndProgressBar();
+
+		var pindex = (page * config.postsPerPage) + 1;
+		pindex = pindex > count ? count : pindex;
+		console.log(pindex);
+		paginator.scrollToPost(pindex);
+	}
+
+	function paginate(ev) {
+		if (!paginator.active) {
+			return;
+		}
+
+		if (ev.which !== 1) {
+			return deactivatePagination();
+		}
+
+		var mousePos = ev.pageY - scrollbar.offset().top - (handle.height() / 2);
+		snapHandleToPage(mousePos);
+	}
+
+	function snapHandleToPage(mousePos) {
+		var numPages = Math.ceil(count / config.postsPerPage),
+			pixelsPerPage = (frame.height() - handle.height()) / numPages,
+			nearestPoint = Math.round(mousePos / pixelsPerPage) * pixelsPerPage;
+
+		page = nearestPoint / pixelsPerPage;
+
+		moveHandle(nearestPoint);
+		$('#pagination').translateHtml('[[global:pagination.page_out_of, ' + page + ', ' + numPages + ']]');
+	}
+
+	function moveHandle(pos) {
+		handle.css({
+			'transform': 'translate3d(0,' + pos + 'px, 0)',
+			'-moz-transform': 'translate3d(0,' + pos + 'px, 0)',
+			'-o-transform': 'translate3d(0,' + pos + 'px, 0)'
+		});
 	}
 
 	return paginator;
