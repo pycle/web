@@ -362,7 +362,6 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 			addBlockquoteEllipses(html.find('.post-content > blockquote'));
 
-			//debug
 			$('.post-content').each(function() {
 				if (!$(this).attr('debug')) {
 					$(this).attr('debug', true);
@@ -428,13 +427,12 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		}
 
 		var reverse = config.topicPostSort === 'newest_to_oldest' || config.topicPostSort === 'most_votes';
-console.log('loadMorePosts')
+
 		loadPostsAfter(after, callback);
 	}
 
 	function loadPostsAfter(after, callback) {
 		var tid = ajaxify.variables.get('topic_id');
-console.log('loadPostsAfter', after)
 		if (!utils.isNumber(tid) || !utils.isNumber(after) || (after === 0 && $('#post-container li.post-row[data-index="1"]').length)) {
 			return;
 		}
@@ -443,13 +441,12 @@ console.log('loadPostsAfter', after)
 		if (!indicatorEl.is(':animated')) {
 			indicatorEl.fadeIn();
 		}
-console.log('loadPostsAfter')
+
 		infinitescroll.loadMore('topics.loadMore', {
 			tid: tid,
 			after: after
 		}, function (data, done) {
 			indicatorEl.fadeOut();
-			console.log('loadMoreDone')
 
 			if (data && data.posts && data.posts.length) {
 				createNewPosts(data, function(postsCreated) {
