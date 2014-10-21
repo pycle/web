@@ -74,6 +74,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		}
 
 		$(window).trigger('action:topic.loaded');
+		debug();
 
 		socket.emit('topics.enter', tid);
 	};
@@ -362,16 +363,20 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 			addBlockquoteEllipses(html.find('.post-content > blockquote'));
 
-			$('.post-content').each(function() {
-				if (!$(this).attr('debug')) {
-					$(this).attr('debug', true);
-					$(this).before('<strong>' + $(this).parents('[data-index]').attr('data-index') + '</strong>');
-				}
-			})
+			debug();
 
 			$(window).trigger('action:posts.loaded');
 			onNewPostsLoaded(html, data.posts);
 			callback(true);
+		});
+	}
+
+	function debug() {
+		$('.post-content').each(function() {
+			if (!$(this).attr('debug')) {
+				$(this).attr('debug', true);
+				$(this).before('<strong>' + $(this).parents('[data-index]').attr('data-index') + '</strong>');
+			}
 		});
 	}
 
