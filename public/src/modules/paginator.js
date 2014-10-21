@@ -7,7 +7,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		frame,
 		scrollbar,
 		animationTimeout = null,
-		index, previousIndex,
+		index,
 		count;
 	
 	paginator.init = function() {
@@ -21,7 +21,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			clickBar: 1,
 			mouseDragging: 1,
 			touchDragging: 1,
-			releaseSwing: 1
+			releaseSwing: 1,
+			swingSpeed: 0.1
 		};
 		
 		frame = new Sly('#frame', options);
@@ -124,14 +125,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		adjustContentLength();
 	};
 
-	var throttle = Date.now();
+	var previousIndex;
 	paginator.update = function() {
-		if ((Date.now() - throttle) < 2000) {
-			return;
-		}
-
-		throttle = Date.now();
-
 		var elements = $(paginator.selector).get();
 
 		if (index > count / 2) {
@@ -143,18 +138,17 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 			if (elementInView(el)) {
 				if (typeof paginator.callback === 'function') {
-					index = parseInt(el.attr('data-index'), 10) + 1;
-					if (previousIndex && !paginator.scrollActive) {
-						var abs = Math.abs(index - previousIndex);
-
-						if (abs > 1) {
-							index = previousIndex + ((index - previousIndex) / abs);
-						}
+					if (previousIndex !== index) {
+						updateTextAndProgressBar();
+						previousIndex = index;
 					}
 
-					previousIndex = index;
-					paginator.callback(el, index, count);
-					updateTextAndProgressBar();
+					if (frame.pos.cur === frame.pos.dest && (Date.now() - throttle) > 250) {
+						console.log('test');
+						paginator.callback(index, count);
+					}
+
+					index = parseInt(el.attr('data-index'), 10) + 1;
 				}
 
 				return false;
@@ -162,12 +156,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		});
 	};
 
+	var throttle = Date.now();
+
 	paginator.onScroll = function(cb) {
-		var prevPos = frame.pos.cur,
-			throttle = Date.now();
+		var prevPos = frame.pos.cur;
 		
 		frame.on('move', function(ev) {
-			if ((Date.now() - throttle) < 250) {
+			if ((Date.now() - throttle) < 150) {
 				return;
 			}
 
@@ -209,7 +204,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		});
 
 		frame.on('moveEnd', function(ev) {
-			
+			//paginator.callback(index, count);
 		});
 	};
 

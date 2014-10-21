@@ -207,7 +207,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		return index;
 	};
 
-	Topic.navigatorCallback = function(element, index, count) {
+	Topic.navigatorCallback = function(index, count) {
 		var path = ajaxify.removeRelativePath(window.location.pathname.slice(1));
 		if (!path.startsWith('topic')) {
 			return 1;
