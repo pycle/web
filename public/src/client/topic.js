@@ -69,6 +69,10 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 		$(window).on('scroll', updateTopicTitle);
 
+		if (utils.isMobile()) {
+			$(window).on('action:paginator.hide', replaceState);
+		}
+
 		$(window).trigger('action:topic.loaded');
 
 		socket.emit('topics.enter', tid);
@@ -207,7 +211,15 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		return index;
 	};
 
+	var previousIndex;
+
 	Topic.navigatorCallback = function(index, count) {
+		if (previousIndex === index) {
+			return;
+		}
+
+		previousIndex = index;
+
 		var path = ajaxify.removeRelativePath(window.location.pathname.slice(1));
 		if (!path.startsWith('topic')) {
 			return 1;
@@ -224,27 +236,32 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			app.removeAlert('bookmark');
 		}
 
-		if (!paginator.scrollActive) {
+		if (!utils.isMobile()) {
+			replaceState();	
+		}
+	};
+
+	function replaceState() {
+		if (!paginator.scrollActive && history.replaceState) {
 			var parts = ajaxify.removeRelativePath(window.location.pathname.slice(1)).split('/'),
 				topicId = parts[1],
 				slug = parts[2],
 				newUrl = 'topic/' + topicId + '/' + (slug ? slug : '');
 
-			if (index > 0) {
-				newUrl += '/' + index;
+			if (previousIndex > 0) {
+				newUrl += '/' + previousIndex;
 			}
 
 			if (newUrl !== currentUrl) {
-				if (history.replaceState) {
-					var search = (window.location.search ? window.location.search : '');
-					history.replaceState({
-						url: newUrl + search
-					}, null, window.location.protocol + '//' + window.location.host + RELATIVE_PATH + '/' + newUrl + search);
-				}
+				var search = (window.location.search ? window.location.search : '');
+				history.replaceState({
+					url: newUrl + search
+				}, null, window.location.protocol + '//' + window.location.host + RELATIVE_PATH + '/' + newUrl + search);
+
 				currentUrl = newUrl;
 			}
 		}
-	};
+	}
 
 	function onNewPostPagination(data) {
 		var posts = data.posts;

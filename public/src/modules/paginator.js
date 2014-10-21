@@ -143,10 +143,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 						previousIndex = index;
 					}
 
-					if (frame.pos.cur === frame.pos.dest && (Date.now() - throttle) > 250) {
-						console.log('test');
-						paginator.callback(index, count);
-					}
+					paginator.callback(index, count);
 
 					index = parseInt(el.attr('data-index'), 10) + 1;
 				}
@@ -274,7 +271,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		clearTimeout(animationTimeout);
 		animationTimeout = setTimeout(function() {
 			scrollbar.addClass('translucent');
-		}, 3000);
+			$(window).trigger('action:paginator.hide');
+		}, 1000);
 	}
 
 	function showScrollbar() {
