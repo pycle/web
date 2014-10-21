@@ -155,6 +155,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				return false;
 			}
 		});
+
+		updateScrollbar();
 	};
 
 	var throttle = Date.now();
@@ -189,9 +191,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					startLoadingAt = el.nextAll('[data-index]').last();
 					startLoadingAt = startLoadingAt.attr('data-index');
 					page = Math.ceil(startLoadingAt / config.postsPerPage);
-					//frame.set('scrollBy', 0);
+
 					cb(1, startLoadingAt, function() {
-						//frame.set('scrollBy', 200);
 						paginator.update();
 						paginator.reload();
 					});
@@ -222,6 +223,24 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		});
 	};
+
+	function updateScrollbar() {
+		var paddingTop = 60,
+			paddingBottom = 10,
+
+			heightPerElement = frame.rel.slideeSize / $(paginator.selector).length,
+			areaMissingAtBottom = (count - parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10)) * heightPerElement,
+			areaMissingAtTop = parseInt($($(paginator.selector).get(1)).attr('data-index'), 10) * heightPerElement,
+
+			totalArea = count * heightPerElement,
+			scrollbarBottom = Math.max((areaMissingAtBottom / totalArea * frame.rel.frameSize), paddingBottom),
+			scrollbarTop = Math.max((areaMissingAtTop / totalArea * frame.rel.frameSize), paddingTop);
+
+		$('#scrollbar').css('bottom', scrollbarBottom + 'px');
+		$('#scrollbar').css('top', scrollbarTop + 'px');
+
+		console.log(scrollbarBottom + scrollbarTop);
+	}
 
 	function generateUrl(index) {
 		var parts = window.location.pathname.split('/');

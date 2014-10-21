@@ -1065,10 +1065,6 @@
 			}
 		};
 
-		self.setHandle = function (name, value) {
-			hPos[name] = value;
-		};
-
 		/**
 		 * Add one or multiple items to the SLIDEE end, or a specified position index.
 		 *
