@@ -585,8 +585,6 @@ var socket,
 					});
 				}
 			});
-
-			templates.setupWebWorker('/src/templates.js');
 		});
 	};
 
@@ -595,4 +593,5 @@ var socket,
 	app.loadConfig();
 	app.alternatingTitle('');
 
+	templates.setupWebWorker('/src/templates.js');
 }());
