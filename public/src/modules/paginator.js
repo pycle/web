@@ -33,7 +33,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		//todo key-bindings
 
-		$(window).on('resize action:ajaxify.end', adjustContentLength);
+		$(window).on('resize action:ajaxify.end', function() {
+			paginator.update();
+			paginator.reload();
+		});
 
 		frame.on('moveEnd', hideScrollbar);
 		scrollbar.on('mouseout', hideScrollbar);
@@ -122,7 +125,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		$(window).on('scroll', paginator.update);
 		paginator.setCount(count);
 
-		adjustContentLength();
+		paginator.update();
+		paginator.reload();
 	};
 
 	var previousIndex;
@@ -188,8 +192,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					//frame.set('scrollBy', 0);
 					cb(1, startLoadingAt, function() {
 						//frame.set('scrollBy', 200);
-						$('.infinite-spacer[data-page="' + page + '"]').remove();
-						adjustContentLength();
+						paginator.update();
+						paginator.reload();
 					});
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
@@ -205,8 +209,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 					cb(-1, startLoadingAt, function() {
 						frame.slideBy($('#content').height() - originalSize, true);
-						$('.infinite-spacer[data-page="' + page + '"]').remove();
-						adjustContentLength();
+						paginator.update();
+						paginator.reload();
 					});
 				}
 			}
@@ -292,69 +296,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	function showScrollbar() {
 		clearTimeout(animationTimeout);
 		scrollbar.removeClass('translucent');
-	}
-
-	function adjustContentLength() {
-		var items = $(paginator.selector).length,
-			content = $('#content'),
-			currentHeight = 0;
-
-		var spacer = $('<div class="infinite-spacer"></div>'),
-			lastIndex = 0;
-
-		$(paginator.selector).each(function() {
-			var el = $(this),
-				index = parseInt(el.attr('data-index'), 10);
-
-			if ((lastIndex + 1) !== index && index !== 0) {
-				var amountOfPages = Math.ceil((index - lastIndex) / config.postsPerPage);
-
-				for (var x = amountOfPages; x > 0; x--) {
-					var page = Math.ceil(index / config.postsPerPage) - x;
-
-					if (!$('.infinite-spacer[data-page="' + page + '"]').length) {
-						spacer.clone()
-							.attr('data-page', page)
-							.insertBefore(el);
-					}
-				}
-			}
-
-			lastIndex = index;
-
-			currentHeight += el.outerHeight();
-		});
-		function temp() {
-			var el = $($(paginator.selector).get(-1)),
-				index = el.attr('data-index');
-
-			if (index !== count) {
-				var amountOfPages = Math.ceil((count - index) / config.postsPerPage);
-
-				for (var x = 0; x < amountOfPages; x++) {
-					var page = Math.ceil(index / config.postsPerPage) + x;
-
-					if (!$('.infinite-spacer[data-page="' + page + '"]').length) {
-						spacer.clone()
-							.attr('data-page', page)
-							.insertAfter(el);
-					}
-				}
-			}	
-		}
-
-		temp();
-		
-
-		var height = items !== count ? ((currentHeight / items) * count) + (count / items * 1000) : content.height(),
-			spacerHeight = height / items + (count / items * 1000),
-			contentHeight = height - ($('.infinite-spacer').length * spacerHeight);
-
-		//content.css('min-height', !$(paginator.selector + '[data-index="' + count + '"]').length ? contentHeight : 0);
-		$('.infinite-spacer').height(spacerHeight);
-
-		paginator.update();
-		paginator.reload();
 	}
 
 	return paginator;
