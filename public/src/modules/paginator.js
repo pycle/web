@@ -177,7 +177,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			var curPos = frame.pos.cur,
 				el, startLoadingAt;
 
-			//if (curPos === frame.pos.end || destPos === frame.pos.end) {
 			if (!paginator.disableForwardLoading && parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10) === count) {
 				paginator.disableForwardLoading = true;
 			}
