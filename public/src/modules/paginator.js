@@ -5,50 +5,30 @@
 define('paginator', ['forum/pagination'], function(pagination) {
 	var paginator = {},
 		frame,
+		content,
 		scrollbar,
 		animationTimeout = null,
 		index,
 		count;
 	
 	paginator.init = function() {
-		var options = {
-			scrollBy: 200,
-			speed: 200,
-			easing: 'easeOutQuart',
-			scrollBar: '#scrollbar',
-			dynamicHandle: 1,
-			dragHandle: 1,
-			clickBar: 1,
-			mouseDragging: 1,
-			touchDragging: 1,
-			releaseSwing: 1,
-			swingSpeed: 0.1
-		};
-		
-		frame = new Sly('#frame', options);
-		frame.init();
+		frame = $('#frame');
+		content = $('#content');
 		scrollbar = $('#scrollbar');
-
-		$('html').addClass('paginated'); // allows this to work for non-JS browsers
-
-		//todo key-bindings
 
 		$(window).on('resize action:ajaxify.end', function() {
 			paginator.update();
-			paginator.reload();
 		});
 
-		frame.on('moveEnd', hideScrollbar);
 		scrollbar.on('mouseout', hideScrollbar);
-
-		frame.on('moveStart', showScrollbar);
 		scrollbar.on('mouseover', showScrollbar);
 
-		hideScrollbar();
-	};
+		frame.on('scroll', function() {
+			showScrollbar();
+			hideScrollbar();
+		});
 
-	paginator.reload = function() {
-		frame.reload();
+		hideScrollbar();
 	};
 
 	paginator.scrollToPost = function(postIndex, highlight, duration, offset) {
@@ -126,7 +106,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		paginator.setCount(count);
 
 		paginator.update();
-		paginator.reload();
 	};
 
 	var previousIndex;
@@ -161,13 +140,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	paginator.onScroll = function(cb) {
-		var prevPos = frame.pos.cur;
+		var prevPos = frame.scrollTop();
 		
-		frame.on('move', function(ev) {
 
+		frame.scroll(function(ev) {
 			paginator.update();
 
-			var curPos = frame.pos.cur,
+			var curPos = frame.scrollTop(),
 				el, startLoadingAt;
 
 			if (!paginator.disableForwardLoading && parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10) === count) {
@@ -185,10 +164,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					startLoadingAt = el.nextAll('[data-index]').last();
 					startLoadingAt = startLoadingAt.attr('data-index');
 
-					cb(1, startLoadingAt, function() {
-						paginator.update();
-						paginator.reload();
-					});
+					cb(1, startLoadingAt, paginator.update);
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
 				el = $($(paginator.selector).get(10));
@@ -203,18 +179,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					cb(-1, startLoadingAt, function() {
 						var slide = $('#content').height() - originalSize;						
 						paginator.update();
-						paginator.reload();
 
-						frame.slideBy(slide, true);	
+						frame.scrollTop(slide + frame.scrollTop());
 					});
 				}
 			}
 			
 			prevPos = curPos;
-		});
-
-		frame.on('moveEnd', function(ev) {
-
 		});
 	};
 
@@ -222,13 +193,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		var paddingTop = 60,
 			paddingBottom = 10,
 
-			heightPerElement = frame.rel.slideeSize / $(paginator.selector).length,
+			heightPerElement = content.height() / $(paginator.selector).length,
 			areaMissingAtBottom = (count - parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10)) * heightPerElement,
 			areaMissingAtTop = parseInt($($(paginator.selector).get(1)).attr('data-index'), 10) * heightPerElement,
 
 			totalArea = count * heightPerElement,
-			scrollbarBottom = Math.max((areaMissingAtBottom / totalArea * frame.rel.frameSize), paddingBottom),
-			scrollbarTop = Math.max((areaMissingAtTop / totalArea * frame.rel.frameSize), paddingTop);
+			scrollbarBottom = Math.max((areaMissingAtBottom / totalArea * frame.height()), paddingBottom),
+			scrollbarTop = Math.max((areaMissingAtTop / totalArea * frame.height()), paddingTop);
 
 		$('#scrollbar').css('bottom', scrollbarBottom + 'px');
 		$('#scrollbar').css('top', scrollbarTop + 'px');
@@ -272,10 +243,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		var done = false;
 		function animateScroll() {
-			//todo, ask baris about duration
-
-			frame.slideTo(scrollTo.offset().top - $('#header-menu').height() - offset);
-			frame.one('moveEnd', function() {
+			$('#frame').animate({
+				scrollTop: (scrollTo.offset().top - $('#header-menu').height() - offset) + 'px'
+			}, duration, function() {
 				if (done) {
 					return;
 				}
@@ -285,7 +255,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				paginator.update();
 				highlightPost();
 
-				// what is this for
+				//what is this for
 				$('body').scrollTop($('body').scrollTop() - 1);
 				$('html').scrollTop($('html').scrollTop() - 1);
 			});
