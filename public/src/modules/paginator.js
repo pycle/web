@@ -182,7 +182,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				el = $($(paginator.selector).get(-10));
 				if (elementInView(el)) {
+					//do this only if using scrollbar
+					frame.set('scrollBy', 0);
 					cb(1, function() {
+						frame.set('scrollBy', 200);
 						el.nextAll('.infinite-spacer').first().remove();
 						adjustContentLength();
 					});
@@ -190,7 +193,10 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
 				el = $($(paginator.selector).get(10));
 				if (elementInView(el)) {
+					//do this only if using scrollbar
+					frame.set('scrollBy', 0);
 					cb(-1, function() {
+						frame.set('scrollBy', 200);
 						el.prevAll('.infinite-spacer').first().remove();
 						adjustContentLength();
 					});
