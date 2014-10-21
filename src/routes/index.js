@@ -149,6 +149,8 @@ module.exports = function(app, middleware) {
 		require('./debug')(app, middleware, controllers);
 	}
 
+	app.use(relativePath + '/src/templates.js', express.static(path.join(__dirname, '../../', 'node_modules/templates.js/lib/templates.js')));
+
 	app.use(relativePath, express.static(path.join(__dirname, '../../', 'public'), {
 		maxAge: app.enabled('cache') ? 5184000000 : 0
 	}));

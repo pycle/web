@@ -585,6 +585,8 @@ var socket,
 					});
 				}
 			});
+
+			templates.setupWebWorker('/src/templates.js');
 		});
 	};
 
