@@ -183,9 +183,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				el = $($(paginator.selector).get(-10));
 				if (elementInView(el)) {
 					//do this only if using scrollbar
-					frame.set('scrollBy', 0);
+					//frame.set('scrollBy', 0);
 					cb(1, el.nextAll().last().attr('data-index'), function() {
-						frame.set('scrollBy', 200);
+						//frame.set('scrollBy', 200);
 						el.nextAll('.infinite-spacer').first().remove();
 						adjustContentLength();
 					});
@@ -194,12 +194,12 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				el = $($(paginator.selector).get(10));
 				if (elementInView(el)) {
 					//do this only if using scrollbar
-					frame.set('scrollBy', 0);
+					//frame.set('scrollBy', 0);
 					var el = (el.prevAll().not(paginator.selector)).first().next(),
 						startLoadingAt = el.attr('data-index') - config.postsPerPage;
 
 					cb(-1, startLoadingAt > 0 ? startLoadingAt : 0, function() {
-						frame.set('scrollBy', 200);
+						//frame.set('scrollBy', 200);
 						el.prevAll('.infinite-spacer').first().remove();
 						adjustContentLength();
 					});
@@ -324,7 +324,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			spacerHeight = height / items + (count / items * 1000);
 
 		content.css('min-height', height - ($('.infinite-spacer').length * spacerHeight));
-		$('.infinite-spacer').height(spacerHeight);
+		$('.infinite-spacer').height((index + config.postsPerPage) > count ? spacerHeight : 0);
 
 		paginator.update();
 		paginator.reload();
