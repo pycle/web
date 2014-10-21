@@ -174,20 +174,20 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			paginator.update();
 
 			var curPos = frame.pos.cur,
-				destPos = frame.pos.dest,
 				el, startLoadingAt, page;
 
-			if (curPos === frame.pos.end || destPos === frame.pos.end) {
+			//if (curPos === frame.pos.end || destPos === frame.pos.end) {
+			if (!paginator.disableForwardLoading && parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10) === count) {
 				paginator.disableForwardLoading = true;
 			}
 
-			if (curPos === 0 || destPos === 0) {
+			if (!paginator.disableReverseLoading && parseInt($($(paginator.selector).get(1)).attr('data-index'), 10) === 1) {
 				paginator.disableReverseLoading = true;
 			}
 
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
 				el = $($(paginator.selector).get(-10));
-				if (elementInView(el)) {
+				if (elementInView(el, 1)) {
 					startLoadingAt = el.nextAll('[data-index]').last();
 					startLoadingAt = startLoadingAt.attr('data-index');
 					page = Math.ceil(startLoadingAt / config.postsPerPage);
@@ -199,7 +199,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
 				el = $($(paginator.selector).get(10));
-				if (elementInView(el)) {
+				if (elementInView(el, -1)) {
 					startLoadingAt = (el.prevAll().not(paginator.selector)).first().next();
 					startLoadingAt = startLoadingAt.attr('data-index') - config.postsPerPage;
 
@@ -238,8 +238,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		$('#scrollbar').css('bottom', scrollbarBottom + 'px');
 		$('#scrollbar').css('top', scrollbarTop + 'px');
-
-		console.log(scrollbarBottom + scrollbarTop);
 	}
 
 	function generateUrl(index) {
@@ -252,13 +250,22 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		$('#pagination').translateHtml('[[global:pagination.out_of, ' + index + ', ' + count + ']]');
 	}
 
-	function elementInView(el) {
+	function elementInView(el, orPastDirection) {
 		var scrollTop = $(window).scrollTop() + $('#header-menu').height();
 		var scrollBottom = scrollTop + $(window).height();
 
 		var elTop = el.offset().top;
 		var elBottom = elTop + Math.floor(el.height());
-		return (elTop >= scrollTop && elBottom <= scrollBottom) || (elTop <= scrollTop && elBottom >= scrollTop);
+		if (orPastDirection) {
+			if (orPastDirection === 1) {
+				return scrollBottom >= elTop;
+			} else {
+				return elBottom <= scrollTop;
+			}
+		} else {
+			return (elTop >= scrollTop && elBottom <= scrollBottom) || (elTop <= scrollTop && elBottom >= scrollTop);	
+		}
+		
 	}
 
 	function scrollToPid(postIndex, highlight, duration, offset) {
