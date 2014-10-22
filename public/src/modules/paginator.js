@@ -52,7 +52,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		duration = duration !== undefined ? duration : 400;
 		paginator.scrollActive = true;
 
-		if($('#post_anchor_' + postIndex).length) {
+		if($('#post_anchor_' + postIndex).length && !utils.isMobile()) {
 			return scrollToPid(postIndex, highlight, duration, offset);
 		}
 
@@ -317,9 +317,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		hideScrollbar();
 		updateTextAndProgressBar();
 
-		var pindex = (page * config.postsPerPage) + 1;
-		pindex = pindex > count ? count : pindex;
-		paginator.scrollToPost(pindex);
+		if (page !== false) {
+			var pindex = (page * config.postsPerPage);
+			pindex = pindex > count ? count : pindex;
+			paginator.scrollToPost(pindex);
+
+			page = false;
+		}
 	}
 
 	function paginate(ev) {
