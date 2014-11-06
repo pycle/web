@@ -179,7 +179,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
-				el = $($(paginator.selector).get(-5));
+				el = $($(paginator.selector).get(-1 * config.postsPerPage));
 				
 				if (parseInt(el.attr('data-index'), 10) < index) {
 					startLoadingAt = el.nextAll('[data-index]').last();
@@ -188,7 +188,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					cb(1, startLoadingAt, paginator.update);
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
-				el = $($(paginator.selector).get(5));
+				el = $($(paginator.selector).get(config.postsPerPage));
 				
 				if (parseInt(el.attr('data-index'), 10) > index) {
 					startLoadingAt = (el.prevAll().not(paginator.selector)).first().next();
