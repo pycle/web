@@ -11,7 +11,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		page,
 		count = null;
 
-	
+	paginator.scrollActive = false;
+
 	paginator.init = function() {
 		ui = {
 			frame: $('#frame'),
@@ -29,6 +30,11 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		ui.window.on('action:ajaxify.end resize', paginator.update);
 		ui.frame.scroll(paginator.update);
+
+		$('html, body, #frame').on('scroll', function(ev) {
+			ev.preventDefault();
+			return false;
+		});
 
 		ui.scrollbar.on('mouseout', hideScrollbar);
 		ui.scrollbar.on('mouseover', showScrollbar);
@@ -173,7 +179,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 
 			if (prevPos < curPos && !paginator.disableForwardLoading) {
-				el = $($(paginator.selector).get(-10));
+				el = $($(paginator.selector).get(-5));
 				
 				if (parseInt(el.attr('data-index'), 10) < index) {
 					startLoadingAt = el.nextAll('[data-index]').last();
@@ -182,7 +188,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 					cb(1, startLoadingAt, paginator.update);
 				}
 			} else if (prevPos > curPos && !paginator.disableReverseLoading) {
-				el = $($(paginator.selector).get(10));
+				el = $($(paginator.selector).get(5));
 				
 				if (parseInt(el.attr('data-index'), 10) > index) {
 					startLoadingAt = (el.prevAll().not(paginator.selector)).first().next();
