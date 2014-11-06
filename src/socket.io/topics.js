@@ -65,7 +65,7 @@ SocketTopics.post = function(socket, data, callback) {
 };
 
 SocketTopics.enter = function(socket, tid, callback) {
-	if (!tid || !socket.uid) {
+	if (!parseInt(tid, 10) || !socket.uid) {
 		return;
 	}
 
@@ -240,6 +240,9 @@ SocketTopics.unpin = function(socket, data, callback) {
 };
 
 function doTopicAction(action, socket, data, callback) {
+	if (!socket.uid) {
+		return;
+	}
 	if(!data || !Array.isArray(data.tids) || !data.cid) {
 		return callback(new Error('[[error:invalid-tid]]'));
 	}
@@ -428,15 +431,13 @@ SocketTopics.loadMore = function(socket, data, callback) {
 			reverse = false,
 			start = Math.max(parseInt(data.after, 10) - 1, 0);
 
-		if (results.settings.topicPostSort === 'newest_to_oldest') {
+		if (results.settings.topicPostSort === 'newest_to_oldest' || results.settings.topicPostSort === 'most_votes') {
 			reverse = true;
-			data.after = results.postCount - data.after;
+			data.after = results.postCount - 1 - data.after;
 			start = Math.max(parseInt(data.after, 10), 0);
-		} else if (results.settings.topicPostSort === 'most_votes') {
-			reverse = true;
-			data.after = results.postCount - data.after;
-			start = Math.max(parseInt(data.after, 10), 0);
-			set = 'tid:' + data.tid + ':posts:votes';
+			if (results.settings.topicPostSort === 'most_votes') {
+				set = 'tid:' + data.tid + ':posts:votes';
+			}
 		}
 
 		var end = start + results.settings.postsPerPage - 1;
@@ -459,14 +460,14 @@ SocketTopics.loadMore = function(socket, data, callback) {
 };
 
 SocketTopics.loadMoreRecentTopics = function(socket, data, callback) {
-	if(!data || !data.term || !data.after) {
+	if(!data || !data.after) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
 	var start = parseInt(data.after, 10),
 		end = start + 9;
 
-	topics.getLatestTopics(socket.uid, start, end, data.term, callback);
+	topics.getRecentTopics(socket.uid, start, end, callback);
 };
 
 SocketTopics.loadMoreUnreadTopics = function(socket, data, callback) {

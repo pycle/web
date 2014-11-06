@@ -50,7 +50,7 @@ function tagRoutes(app, middleware, controllers) {
 
 function categoryRoutes(app, middleware, controllers) {
 	setupPageRoute(app, '/popular/:term?', middleware, [], controllers.categories.popular);
-	setupPageRoute(app, '/recent/:term?', middleware, [], controllers.categories.recent);
+	setupPageRoute(app, '/recent', middleware, [], controllers.categories.recent);
 	setupPageRoute(app, '/unread', middleware, [middleware.authenticate], controllers.categories.unread);
 	app.get('/api/unread/total', middleware.authenticate, controllers.categories.unreadTotal);
 
@@ -151,6 +151,16 @@ module.exports = function(app, middleware) {
 
 	app.use(relativePath + '/src/templates.js', express.static(path.join(__dirname, '../../', 'node_modules/templates.js/lib/templates.js')));
 
+	app.use(function(req, res, next) {
+		if (req.user || parseInt(meta.config.privateUploads, 10) !== 1) {
+			return next();
+		}
+		if (req.path.indexOf('/uploads/files') === 0) {
+			return res.status(403).json('not-allowed');
+		}
+		next();
+	});
+
 	app.use(relativePath, express.static(path.join(__dirname, '../../', 'public'), {
 		maxAge: app.enabled('cache') ? 5184000000 : 0
 	}));
@@ -167,7 +177,8 @@ function handleErrors(err, req, res, next) {
 	// we may use properties of the error object
 	// here and next(err) appropriately, or if
 	// we possibly recovered from the error, simply next().
-	console.error(err.stack);
+	//console.error(err.stack, req.path);
+	winston.error(req.path + '\n', err.stack);
 
 	var status = err.status || 500;
 	res.status(status);

@@ -1,5 +1,5 @@
 var async = require('async'),
-
+	winston = require('winston'),
 	db = require('./database'),
 	posts = require('./posts'),
 	user = require('./user'),
@@ -25,8 +25,10 @@ var async = require('async'),
 				return callback(new Error('[[error:cant-vote-self-post]]'));
 			}
 
+			var now = Date.now();
+
 			if(type === 'upvote' && !unvote) {
-				db.sortedSetAdd('uid:' + uid + ':upvote', postData.timestamp, pid);
+				db.sortedSetAdd('uid:' + uid + ':upvote', now, pid);
 			} else {
 				db.sortedSetRemove('uid:' + uid + ':upvote', pid);
 			}
@@ -34,7 +36,7 @@ var async = require('async'),
 			if(type === 'upvote' || unvote) {
 				db.sortedSetRemove('uid:' + uid + ':downvote', pid);
 			} else {
-				db.sortedSetAdd('uid:' + uid + ':downvote', postData.timestamp, pid);
+				db.sortedSetAdd('uid:' + uid + ':downvote', now, pid);
 			}
 
 			user[type === 'upvote' ? 'incrementUserFieldBy' : 'decrementUserFieldBy'](postData.uid, 'reputation', 1, function (err, newreputation) {
@@ -44,11 +46,8 @@ var async = require('async'),
 
 				db.sortedSetAdd('users:reputation', newreputation, postData.uid);
 
-				if (parseInt(meta.config['autoban:downvote'], 10) === 1 && newreputation < parseInt(meta.config['autoban:downvote:threshold'], 10)) {
-					var adminUser = require('./socket.io/admin/user');
-					adminUser.banUser(postData.uid, function() {
-						require('winston').info('uid ' + uid + ' was banned for reaching ' + newreputation + ' reputation');
-					});
+				if (type === 'downvote') {
+					banUserForLowReputation(postData.uid, newreputation);
 				}
 
 				adjustPostVotes(pid, uid, type, unvote, function(err, votes) {
@@ -64,6 +63,23 @@ var async = require('async'),
 				});
 			});
 		});
+	}
+
+	function banUserForLowReputation(uid, newreputation) {
+		if (parseInt(meta.config['autoban:downvote'], 10) === 1 && newreputation < parseInt(meta.config['autoban:downvote:threshold'], 10)) {
+			user.getUserField(uid, 'banned', function(err, banned) {
+				if (err || parseInt(banned, 10) === 1) {
+					return;
+				}
+				var adminUser = require('./socket.io/admin/user');
+				adminUser.banUser(uid, function(err) {
+					if (err) {
+						return winston.error(err.message);
+					}
+					winston.info('uid ' + uid + ' was banned for reaching ' + newreputation + ' reputation');
+				});
+			});
+		}
 	}
 
 	function adjustPostVotes(pid, uid, type, unvote, callback) {
@@ -179,6 +195,9 @@ var async = require('async'),
 	};
 
 	Favourites.hasVoted = function(pid, uid, callback) {
+		if (!parseInt(uid, 10)) {
+			return callback(null, {upvoted: false, downvoted: false});
+		}
 		db.isMemberOfSets(['pid:' + pid + ':upvote', 'pid:' + pid + ':downvote'], uid, function(err, hasVoted) {
 			if (err) {
 				return callback(err);
@@ -189,6 +208,10 @@ var async = require('async'),
 	};
 
 	Favourites.getVoteStatusByPostIDs = function(pids, uid, callback) {
+		if (!parseInt(uid, 10)) {
+			var data = pids.map(function() {return false;});
+			return callback(null, {upvotes: data, downvotes: data});
+		}
 		var upvoteSets = [],
 			downvoteSets = [];
 
@@ -268,10 +291,17 @@ var async = require('async'),
 	}
 
 	Favourites.hasFavourited = function(pid, uid, callback) {
+		if (!parseInt(uid, 10)) {
+			return callback(null, false);
+		}
 		db.isSetMember('pid:' + pid + ':users_favourited', uid, callback);
 	};
 
 	Favourites.getFavouritesByPostIDs = function(pids, uid, callback) {
+		if (!parseInt(uid, 10)) {
+			return callback(null, pids.map(function() {return false;}));
+		}
+
 		var sets = [];
 		for (var i=0; i<pids.length; ++i) {
 			sets.push('pid:' + pids[i] + ':users_favourited');

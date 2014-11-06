@@ -1,24 +1,16 @@
 
 'use strict';
 
-var	meta = require('./../meta'),
-	db = require('./../database'),
-	plugins = require('./../plugins');
+var	meta = require('../meta'),
+	db = require('../database'),
+	plugins = require('../plugins');
 
 module.exports = function(User) {
 
 	User.getSettings = function(uid, callback) {
-		db.getObject('user:' + uid + ':settings', function(err, settings) {
-			if(err) {
-				return callback(err);
-			}
-
-			if(!settings) {
-				settings = {};
-			}
-
+		function onSettingsLoaded(settings) {
 			plugins.fireHook('filter:user.getSettings', {uid: uid, settings: settings}, function(err, data) {
-				if(err) {
+				if (err) {
 					return callback(err);
 				}
 
@@ -37,9 +29,22 @@ module.exports = function(User) {
 				settings.followTopicsOnCreate = (settings.followTopicsOnCreate === null || settings.followTopicsOnCreate === undefined) ? true : parseInt(settings.followTopicsOnCreate, 10) === 1;
 				settings.followTopicsOnReply = parseInt(settings.followTopicsOnReply, 10) === 1;
 				settings.sendChatNotifications = parseInt(settings.sendChatNotifications, 10) === 1;
+				settings.restrictChat = parseInt(settings.restrictChat, 10) === 1;
 
 				callback(null, settings);
 			});
+		}
+
+		if (!parseInt(uid, 10)) {
+			return onSettingsLoaded({});
+		}
+
+		db.getObject('user:' + uid + ':settings', function(err, settings) {
+			if (err) {
+				return callback(err);
+			}
+
+			onSettingsLoaded(settings ? settings : {});
 		});
 	};
 
@@ -88,7 +93,8 @@ module.exports = function(User) {
 			language: data.language || meta.config.defaultLang,
 			followTopicsOnCreate: data.followTopicsOnCreate,
 			followTopicsOnReply: data.followTopicsOnReply,
-			sendChatNotifications: data.sendChatNotifications
+			sendChatNotifications: data.sendChatNotifications,
+			restrictChat: data.restrictChat
 		}, callback);
 	};
 

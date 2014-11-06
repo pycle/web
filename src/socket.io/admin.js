@@ -36,6 +36,9 @@ var	async = require('async'),
 	};
 
 SocketAdmin.before = function(socket, method, next) {
+	if (!socket.uid) {
+		return;
+	}
 	user.isAdministrator(socket.uid, function(err, isAdmin) {
 		if (!err && isAdmin) {
 			next();
@@ -176,7 +179,7 @@ SocketAdmin.email.test = function(socket, data, callback) {
 	if (plugins.hasListeners('action:email.send')) {
 		emailer.send('test', socket.uid, {
 			subject: '[NodeBB] Test Email',
-			site_title: meta.config.site_title || 'NodeBB'
+			site_title: meta.config.title || 'NodeBB'
 		});
 		callback();
 	} else {

@@ -21,7 +21,6 @@
 
 	function logout(req, res) {
 		if (req.user && parseInt(req.user.uid, 10) > 0) {
-			winston.info('[Auth] Session ' + req.sessionID + ' logout (uid: ' + req.user.uid + ')');
 
 			var ws = require('../socket.io');
 			ws.logoutUser(req.user.uid);
@@ -226,8 +225,7 @@
 
 	Auth.login = function(username, password, next) {
 		if (!username || !password) {
-			next(new Error('[[error:invalid-password]]'));
-			return;
+			return next(new Error('[[error:invalid-password]]'));
 		}
 
 		var userslug = utils.slugify(username);
@@ -237,7 +235,7 @@
 				return next(err);
 			}
 
-			if(!uid) {
+			if (!uid) {
 				return next(null, false, '[[error:no-user]]');
 			}
 

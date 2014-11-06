@@ -123,10 +123,12 @@ var async = require('async'),
 				return callback(err);
 			}
 
-			// User counts
-			results.base.count = numUsers || results.users.length;
-			results.base.members = results.users;
-			results.base.memberCount = numUsers || results.users.length;
+			results.base.members = results.users.filter(function(user) {
+				return typeof user !== 'undefined';
+			});
+
+			results.base.count = numUsers || results.base.members.length;
+			results.base.memberCount = numUsers || results.base.members.length;
 
 			results.base.deleted = !!parseInt(results.base.deleted, 10);
 			results.base.hidden = !!parseInt(results.base.hidden, 10);
@@ -139,24 +141,30 @@ var async = require('async'),
 	};
 
 	Groups.search = function(query, options, callback) {
-		if (query.length) {
-			db.getSetMembers('groups', function(err, groups) {
-				groups = groups.filter(function(groupName) {
-					return groupName.match(new RegExp(utils.escapeRegexChars(query), 'i'));
-				});
-
-				async.map(groups, function(groupName, next) {
-					Groups.get(groupName, options, next);
-				}, function(err, groups) {
-					callback(err, internals.filterGroups(groups, options));
-				});
-			});
-		} else {
-			callback(null, []);
+		if (!query) {
+			return callback(null, []);
 		}
+
+		db.getSetMembers('groups', function(err, groups) {
+			if (err) {
+				return callback(err);
+			}
+			groups = groups.filter(function(groupName) {
+				return groupName.match(new RegExp(utils.escapeRegexChars(query), 'i'));
+			});
+
+			async.map(groups, function(groupName, next) {
+				Groups.get(groupName, options, next);
+			}, function(err, groups) {
+				callback(err, internals.filterGroups(groups, options));
+			});
+		});
 	};
 
 	Groups.isMember = function(uid, groupName, callback) {
+		if (!uid || parseInt(uid, 10) <= 0) {
+			return callback(null, false);
+		}
 		db.isSetMember('group:' + groupName + ':members', uid, callback);
 	};
 
@@ -165,6 +173,9 @@ var async = require('async'),
 	};
 
 	Groups.isMemberOfGroups = function(uid, groups, callback) {
+		if (!uid || parseInt(uid, 10) <= 0) {
+			return callback(null, groups.map(function() {return false;}));
+		}
 		groups = groups.map(function(groupName) {
 			return 'group:' + groupName + ':members';
 		});
@@ -448,13 +459,14 @@ var async = require('async'),
 				plugins.fireHook('action:groups.join', {
 					groupName: groupName,
 					uid: uid
-				});				
+				});
 			} else {
 				Groups.create(groupName, '', function(err) {
-					if (err) {
+					if (err && err.message !== '[[error:group-already-exists]]') {
 						winston.error('[groups.join] Could not create new hidden group: ' + err.message);
 						return callback(err);
 					}
+
 					Groups.hide(groupName);
 					db.setAdd('group:' + groupName + ':members', uid, callback);
 					plugins.fireHook('action:groups.join', {

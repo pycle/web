@@ -137,6 +137,9 @@ accountsController.getUserByUID = function(req, res, next) {
 	var uid = req.params.uid ? req.params.uid : 0;
 
 	user.getUserData(uid, function(err, userData) {
+		if (err) {
+			return next(err);
+		}
 		res.json(userData);
 	});
 };
@@ -170,7 +173,7 @@ accountsController.getAccount = function(req, res, next) {
 				posts.getPostsByUid(callerUID, userData.theirid, 0, 9, next);
 			},
 			signature: function(next) {
-				postTools.parse(userData.signature, next);
+				postTools.parseSignature(userData, callerUID, next);
 			}
 		}, function(err, results) {
 			if(err) {
@@ -188,7 +191,6 @@ accountsController.getAccount = function(req, res, next) {
 				userData.profileviews = 1;
 			}
 
-			userData.signature = results.signature;
 			res.render('account/profile', userData);
 		});
 	});
@@ -426,7 +428,7 @@ accountsController.uploadPicture = function (req, res, next) {
 		});
 	}
 
-	var updateUid = req.user.uid;
+	var updateUid = req.user ? req.user.uid : 0;
 	var imageDimension = parseInt(meta.config.profileImageDimension, 10) || 128;
 
 	async.waterfall([
@@ -480,8 +482,8 @@ accountsController.uploadPicture = function (req, res, next) {
 			return res.json({error:err.message});
 		}
 
-		if(plugins.hasListeners('filter:uploadImage')) {
-			return plugins.fireHook('filter:uploadImage', req.files.userPhoto, done);
+		if (plugins.hasListeners('filter:uploadImage')) {
+			return plugins.fireHook('filter:uploadImage', {image: req.files.userPhoto, uid: updateUid}, done);
 		}
 
 		var convertToPNG = parseInt(meta.config['profile:convertProfileImageToPNG'], 10) === 1;
@@ -541,7 +543,8 @@ accountsController.getChats = function(req, res, next) {
 			return res.render('chats', {
 				chats: results.recentChats.users,
 				nextStart: results.recentChats.nextStart,
-				contacts: results.contacts
+				contacts: results.contacts,
+				allowed: true
 			});
 		}
 
@@ -550,7 +553,8 @@ accountsController.getChats = function(req, res, next) {
 			function(toUid, next) {
 				async.parallel({
 					toUser: async.apply(user.getUserFields, toUid, ['uid', 'username']),
-					messages: async.apply(messaging.getMessages, req.user.uid, toUid, 'day', false)
+					messages: async.apply(messaging.getMessages, req.user.uid, toUid, 'recent', false),
+					allowed: async.apply(messaging.canMessage, req.user.uid, toUid)
 				}, next);
 			}
 		], function(err, data) {
@@ -563,7 +567,8 @@ accountsController.getChats = function(req, res, next) {
 				nextStart: results.recentChats.nextStart,
 				contacts: results.contacts,
 				meta: data.toUser,
-				messages: data.messages
+				messages: data.messages,
+				allowed: data.allowed
 			});
 		});
 	});

@@ -102,6 +102,10 @@ var async = require('async'),
 		], callback);
 	};
 
+	Posts.exists = function(pid, callback) {
+		db.isSortedSetMember('posts:pid', pid, callback);
+	};
+
 	Posts.getPostsByTid = function(tid, set, start, end, uid, reverse, callback) {
 		Posts.getPidsFromSet(set, start, end, reverse, function(err, pids) {
 			if(err) {
@@ -142,16 +146,7 @@ var async = require('async'),
 
 				postData.relativeTime = utils.toISOString(postData.timestamp);
 				postData.relativeEditTime = parseInt(postData.edited, 10) !== 0 ? utils.toISOString(postData.edited) : '';
-
-				postTools.parse(postData.content, function(err, content) {
-					if(err) {
-						return next(err);
-					}
-
-					postData.content = content;
-					next(null, postData);
-				});
-
+				postTools.parsePost(postData, uid, next);
 			}, function(err, posts) {
 				if (err) {
 					return callback(err);
@@ -172,7 +167,7 @@ var async = require('async'),
 		});
 	};
 
-	Posts.getUserInfoForPosts = function(uids, callback) {
+	Posts.getUserInfoForPosts = function(uids, uid, callback) {
 		async.parallel({
 			groups: function(next) {
 				groups.getUserGroups(uids, next);
@@ -208,7 +203,7 @@ var async = require('async'),
 						if (parseInt(meta.config.disableSignatures, 10) === 1) {
 							return next();
 						}
-						postTools.parseSignature(userData.signature, next);
+						postTools.parseSignature(userData, uid, next);
 					},
 					customProfileInfo: function(next) {
 						plugins.fireHook('filter:posts.custom_profile_info', {profile: [], uid: userData.uid}, next);
@@ -217,7 +212,7 @@ var async = require('async'),
 					if (err) {
 						return next(err);
 					}
-					userData.signature = results.signature;
+
 					userData.custom_profile_info = results.customProfileInfo.profile;
 
 					plugins.fireHook('filter:posts.modifyUserInfo', userData, next);
@@ -270,13 +265,16 @@ var async = require('async'),
 							return next(err);
 						}
 
-						var cidKeys = topics.map(function(topic) {
-							return 'category:' + topic.cid;
+						var cids = topics.map(function(topic) {
+							if (topic) {
+								topic.title = validator.escape(topic.title);
+							}
+							return topic && topic.cid;
 						}).filter(function(value, index, array) {
-							return array.indexOf(value) === index;
+							return value && array.indexOf(value) === index;
 						});
 
-						db.getObjectsFields(cidKeys, ['cid', 'name', 'icon', 'slug'], function(err, categories) {
+						categories.getMultipleCategoryFields(cids, ['cid', 'name', 'icon', 'slug'], function(err, categories) {
 							next(err, {topics: topics, categories: categories});
 						});
 					});
@@ -321,8 +319,6 @@ var async = require('async'),
 					post.user = results.users[post.uid];
 					post.topic = results.topics[post.tid];
 					post.category = results.categories[post.topic.cid];
-
-					post.topic.title = validator.escape(post.topic.title);
 					post.relativeTime = utils.toISOString(post.timestamp);
 
 					if (!post.content || !options.parse) {
@@ -330,12 +326,12 @@ var async = require('async'),
 						return next(null, post);
 					}
 
-					postTools.parse(post.content, function(err, content) {
+					postTools.parsePost(post, uid, function(err, post) {
 						if (err) {
 							return next(err);
 						}
 
-						post.content = stripTags(content);
+						post.content = stripTags(post.content);
 
 						next(null, post);
 					});
@@ -574,6 +570,9 @@ var async = require('async'),
 	Posts.isOwner = function(pid, uid, callback) {
 		uid = parseInt(uid, 10);
 		if (Array.isArray(pid)) {
+			if (!uid) {
+				return callback(null, pid.map(function() {return false;}));
+			}
 			Posts.getPostsFields(pid, ['uid'], function(err, posts) {
 				if (err) {
 					return callback(err);
@@ -584,11 +583,26 @@ var async = require('async'),
 				callback(null, posts);
 			});
 		} else {
+			if (!uid) {
+				return callback(null, false);
+			}
 			Posts.getPostField(pid, 'uid', function(err, author) {
 				callback(err, parseInt(author, 10) === uid);
 			});
 		}
 	};
+
+	Posts.isModerator = function(pids, uid, callback) {
+		if (!parseInt(uid, 10)) {
+			return callback(null, pids.map(function() {return false;}));
+		}
+		Posts.getCidsByPids(pids, function(err, cids) {
+			if (err) {
+				return callback(err);
+			}
+			user.isModerator(uid, cids, callback);
+		});
+	}
 
 	Posts.isMain = function(pid, callback) {
 		Posts.getPostField(pid, 'tid', function(err, tid) {

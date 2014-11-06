@@ -314,15 +314,15 @@ var socket,
 		}
 
 		require(['chat'], function (chat) {
+			function loadAndCenter(chatModal) {
+				chat.load(chatModal.attr('UUID'));
+				chat.center(chatModal);
+			}
+
 			if (!chat.modalExists(touid)) {
 				chat.createModal(username, touid, loadAndCenter);
 			} else {
 				loadAndCenter(chat.getModal(touid));
-			}
-
-			function loadAndCenter(chatModal) {
-				chat.load(chatModal.attr('UUID'));
-				chat.center(chatModal);
 			}
 		});
 	};
@@ -352,7 +352,7 @@ var socket,
 				titleObj.interval = setInterval(function() {
 					var title = titleObj.titles[titleObj.titles.indexOf(window.document.title) ^ 1];
 					if (title) {
-						window.document.title = title;
+						window.document.title = $('<div/>').html(title).text();
 					}
 				}, 2000);
 			});
@@ -361,7 +361,7 @@ var socket,
 				clearInterval(titleObj.interval);
 			}
 			if (titleObj.titles[0]) {
-				window.document.title = titleObj.titles[0];
+				window.document.title = $('<div/>').html(titleObj.titles[0]).text();
 			}
 		}
 	};
@@ -374,6 +374,9 @@ var socket,
 		}
 
 		socket.emit('meta.buildTitle', url, function(err, title, numNotifications) {
+			if (err) {
+				return;
+			}
 			titleObj.titles[0] = (numNotifications > 0 ? '(' + numNotifications + ') ' : '') + title;
 			app.alternatingTitle('');
 		});

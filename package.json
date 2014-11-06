@@ -2,7 +2,7 @@
   "name": "nodebb",
   "license": "GPLv3 or later",
   "description": "NodeBB Forum",
-  "version": "0.5.3-dev",
+  "version": "0.6.0-dev",
   "homepage": "http://www.nodebb.org",
   "repository": {
     "type": "git",
@@ -39,6 +39,7 @@
     "nodebb-plugin-markdown": "^0.7.0",
     "nodebb-plugin-mentions": "~0.6.0",
     "nodebb-plugin-soundpack-default": "~0.1.1",
+    "nodebb-plugin-spam-be-gone": "^0.2.51",
     "nodebb-theme-lavender": "~0.1.0",
     "nodebb-theme-vanilla": "~0.1.0",
     "nodebb-widget-essentials": "~0.1.1",
@@ -60,7 +61,7 @@
     "uglify-js": "git+https://github.com/julianlam/UglifyJS2.git",
     "underscore": "~1.7.0",
     "validator": "~3.21.0",
-    "winston": "^0.8.0",
+    "winston": "^0.8.1",
     "xregexp": "~2.0.0"
   },
   "devDependencies": {

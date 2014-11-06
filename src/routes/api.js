@@ -55,7 +55,7 @@ function upload(req, res, filesIterator, next) {
 function uploadPost(req, res, next) {
 	upload(req, res, function(file, next) {
 		if(file.type.match(/image./)) {
-			uploadImage(file, next);
+			uploadImage(req.user.uid, file, next);
 		} else {
 			uploadFile(file, next);
 		}
@@ -75,7 +75,7 @@ function uploadThumb(req, res, next) {
 				if (err) {
 					return next(err);
 				}
-				uploadImage(file, next);
+				uploadImage(req.user.uid, file, next);
 			});
 		} else {
 			next(new Error('[[error:invalid-file]]'));
@@ -84,22 +84,22 @@ function uploadThumb(req, res, next) {
 }
 
 
-function uploadImage(image, callback) {
-	if(plugins.hasListeners('filter:uploadImage')) {
-		plugins.fireHook('filter:uploadImage', image, callback);
+function uploadImage(uid, image, callback) {
+	if (plugins.hasListeners('filter:uploadImage')) {
+		plugins.fireHook('filter:uploadImage', {image: image, uid: uid}, callback);
 	} else {
 
 		if (parseInt(meta.config.allowFileUploads, 10)) {
-			uploadFile(image, callback);
+			uploadFile(uid, image, callback);
 		} else {
 			callback(new Error('[[error:uploads-are-disabled]]'));
 		}
 	}
 }
 
-function uploadFile(file, callback) {
-	if(plugins.hasListeners('filter:uploadFile')) {
-		plugins.fireHook('filter:uploadFile', file, callback);
+function uploadFile(uid, file, callback) {
+	if (plugins.hasListeners('filter:uploadFile')) {
+		plugins.fireHook('filter:uploadFile', {file: file, uid: uid}, callback);
 	} else {
 
 		if(parseInt(meta.config.allowFileUploads, 10) !== 1) {
@@ -206,8 +206,11 @@ module.exports =  function(app, middleware, controllers) {
 	router.get('/categories/:cid/moderators', getModerators);
 	router.get('/recent/posts/:term?', getRecentPosts);
 
-	router.post('/post/upload', middleware.applyCSRF, uploadPost);
-	router.post('/topic/thumb/upload', middleware.applyCSRF, uploadThumb);
-	router.post('/user/:userslug/uploadpicture', middleware.applyCSRF, middleware.authenticate, middleware.checkGlobalPrivacySettings, middleware.checkAccountPermissions, controllers.accounts.uploadPicture);
+	var multipart = require('connect-multiparty');
+	var multipartMiddleware = multipart();
+
+	router.post('/post/upload', multipartMiddleware, middleware.applyCSRF, uploadPost);
+	router.post('/topic/thumb/upload', multipartMiddleware, middleware.applyCSRF, uploadThumb);
+	router.post('/user/:userslug/uploadpicture', multipartMiddleware, middleware.applyCSRF, middleware.authenticate, middleware.checkGlobalPrivacySettings, middleware.checkAccountPermissions, controllers.accounts.uploadPicture);
 
 };

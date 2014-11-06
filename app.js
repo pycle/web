@@ -37,12 +37,9 @@ global.env = process.env.NODE_ENV || 'production';
 
 winston.remove(winston.transports.Console);
 winston.add(winston.transports.Console, {
-	colorize: true
-});
-
-winston.add(winston.transports.File, {
-	filename: 'logs/error.log',
-	level: 'error'
+	colorize: true,
+	timestamp: true,
+	level: 'info'
 });
 
 // TODO: remove once https://github.com/flatiron/winston/issues/280 is fixed
@@ -106,7 +103,7 @@ function loadConfig() {
 function start() {
 	loadConfig();
 
-	if (!cluster.isWorker) {
+	if (!cluster.isWorker || process.env.cluster_setup === 'true') {
 		winston.info('Time: ' + new Date());
 		winston.info('Initializing NodeBB v' + pkg.version);
 		winston.info('* using configuration stored in: ' + configFile);

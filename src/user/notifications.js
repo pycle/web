@@ -20,6 +20,9 @@ var async = require('async'),
 (function(UserNotifications) {
 
 	UserNotifications.get = function(uid, callback) {
+		if (!parseInt(uid, 10)) {
+			return callback(null , {read: [], unread: []});
+		}
 		getNotifications(uid, 10, function(err, notifications) {
 			if (err) {
 				return callback(err);
@@ -230,6 +233,20 @@ var async = require('async'),
 		});
 	};
 
+	UserNotifications.deleteAll = function(uid, callback) {
+		if (!parseInt(uid, 10)) {
+			return callback();
+		}
+		async.parallel([
+			function(next) {
+				db.delete('uid:' + uid + ':notifications:unread', next);
+			},
+			function(next) {
+				db.delete('uid:' + uid + ':notifications:read', next);
+			}
+		], callback);
+	};
+
 	UserNotifications.sendTopicNotificationToFollowers = function(uid, topicData, postData) {
 		db.getSetMembers('followers:' + uid, function(err, followers) {
 			if (err || !Array.isArray(followers) || !followers.length) {
@@ -276,6 +293,19 @@ var async = require('async'),
 		}, function(err, notification) {
 			if (!err && notification) {
 				notifications.push(notification, [uid]);
+			}
+		});
+	};
+
+	UserNotifications.sendNameChangeNotification = function(uid, username) {
+		notifications.create({
+			bodyShort: '[[user:username_taken_workaround, ' + username + ']]',
+			image: 'brand:logo',
+			nid: 'username_taken:' + uid,
+			datetime: Date.now()
+		}, function(err, notification) {
+			if (!err && notification) {
+				notifications.push(notification, uid);
 			}
 		});
 	};

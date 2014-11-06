@@ -41,10 +41,12 @@ Loader.init = function(callback) {
 	}
 
 	process.on('SIGHUP', Loader.restart);
+	process.on('SIGUSR2', Loader.reload);
 	callback();
 };
 
 Loader.displayStartupMessages = function(callback) {
+	console.log('');
 	console.log('NodeBB v' + pkg.version + ' Copyright (C) 2013-2014 NodeBB Inc.');
 	console.log('This program comes with ABSOLUTELY NO WARRANTY.');
 	console.log('This is free software, and you are welcome to redistribute it under certain conditions.');
@@ -160,41 +162,46 @@ Loader.addClusterEvents = function(callback) {
 			}
 		}
 
-		console.log('[cluster] Child Process (' + worker.process.pid + ') has exited (code: ' + code + ')');
+		console.log('[cluster] Child Process (' + worker.process.pid + ') has exited (code: ' + code + ', signal: ' + signal +')');
 		if (!worker.suicide) {
 			console.log('[cluster] Spinning up another process...');
 
 			var wasPrimary = parseInt(worker.id, 10) === Loader.primaryWorker;
-			cluster.fork({
-				handle_jobs: wasPrimary
-			});
+			forkWorker(wasPrimary);
 		}
 	});
 
+	cluster.on('disconnect', function(worker) {
+		console.log('[cluster] Child Process (' + worker.process.pid + ') has disconnected');
+	});
+
 	callback();
-}
+};
 
 Loader.start = function(callback) {
-	var output = logrotate({ file: __dirname + '/logs/output.log', size: '1m', keep: 3, compress: true }),
-		worker;
-
 	console.log('Clustering enabled: Spinning up ' + numProcs + ' process(es).\n');
 
-	for(var x=0;x<numProcs;x++) {
-		// Only the first worker sets up templates/sounds/jobs/etc
-		worker = cluster.fork({
-			cluster_setup: x === 0,
-			handle_jobs: x === 0
-		});
-
-		// Logging
-		if (silent) {
-			worker.process.stdout.pipe(output);
-		}
+	for(var x=0; x<numProcs; ++x) {
+		forkWorker(x === 0);
 	}
 
-	if (callback) callback();
+	if (callback) {
+		callback();
+	}
 };
+
+function forkWorker(isPrimary) {
+	var worker = cluster.fork({
+			cluster_setup: isPrimary,
+			handle_jobs: isPrimary
+		}),
+		output = logrotate({ file: __dirname + '/logs/output.log', size: '1m', keep: 3, compress: true });
+
+	if (silent) {
+		worker.process.stdout.pipe(output);
+		worker.process.stderr.pipe(output);
+	}
+}
 
 Loader.restart = function(callback) {
 	// Slate existing workers for termination -- welcome to death row.
@@ -214,7 +221,7 @@ Loader.notifyWorkers = function (msg) {
 	Object.keys(cluster.workers).forEach(function(id) {
 		cluster.workers[id].send(msg);
 	});
-}
+};
 
 
 nconf.argv().file({

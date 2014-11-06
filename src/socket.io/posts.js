@@ -96,7 +96,25 @@ SocketPosts.unfavourite = function(socket, data, callback) {
 };
 
 function favouriteCommand(command, eventName, socket, data, callback) {
-	if(data && data.pid && data.room_id) {
+	if(!data || !data.pid || !data.room_id) {
+		return;
+	}
+	async.parallel({
+		exists: function(next) {
+			posts.exists(data.pid, next);
+		},
+		deleted: function(next) {
+			posts.getPostField(data.pid, 'deleted', next);
+		}
+	}, function(err, results) {
+		if (err || !results.exists) {
+			return callback(err);
+		}
+
+		if (parseInt(results.deleted, 10) === 1) {
+			return callback(new Error('[[error:post-deleted]]'));
+		}
+
 		favourites[command](data.pid, socket.uid, function(err, result) {
 			if (err) {
 				return callback(err);
@@ -109,7 +127,7 @@ function favouriteCommand(command, eventName, socket, data, callback) {
 			}
 			callback();
 		});
-	}
+	});
 }
 
 SocketPosts.sendNotificationToPostOwner = function(pid, fromuid, notification) {
@@ -121,7 +139,7 @@ SocketPosts.sendNotificationToPostOwner = function(pid, fromuid, notification) {
 			return;
 		}
 
-		if (fromuid === parseInt(postData.uid, 10)) {
+		if (!postData.uid || fromuid === parseInt(postData.uid, 10)) {
 			return;
 		}
 
@@ -183,7 +201,7 @@ SocketPosts.edit = function(socket, data, callback) {
 	}
 
 	postTools.edit(socket.uid, data.pid, data.title, data.content, {topic_thumb: data.topic_thumb, tags: data.tags}, function(err, results) {
-		if(err) {
+		if (err) {
 			return callback(err);
 		}
 
@@ -227,7 +245,7 @@ function deleteOrRestore(command, socket, data, callback) {
 }
 
 SocketPosts.purge = function(socket, data, callback) {
-	if(!data) {
+	if(!data || !parseInt(data.pid, 10)) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 	postTools.purge(socket.uid, data.pid, function(err) {
@@ -294,18 +312,20 @@ SocketPosts.flag = function(socket, pid, callback) {
 			}
 			userName = userData.username;
 
-			posts.getPostFields(pid, ['tid', 'uid', 'content'], next);
+			posts.getPostFields(pid, ['tid', 'uid', 'content', 'deleted'], next);
 		},
 		function(postData, next) {
+			if (parseInt(postData.deleted) === 1) {
+				return next(new Error('[[error:post-deleted]]'));
+			}
 			post = postData;
 			topics.getTopicField(postData.tid, 'title', next);
 		},
 		function(topicTitle, next) {
 			message = '[[notifications:user_flagged_post_in, ' + userName + ', ' + topicTitle + ']]';
-			postTools.parse(post.content, next);
+			postTools.parse(post, socket.uid, next);
 		},
-		function(postContent, next) {
-			post.content = postContent;
+		function(post, next) {
 			groups.get('administrators', {}, next);
 		},
 		function(adminGroup, next) {

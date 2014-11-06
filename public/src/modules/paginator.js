@@ -42,9 +42,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		hideScrollbar();
 	};
 
-	// offset and duration deprecated
+	// duration deprecated
 	paginator.scrollToPost = function(postIndex, highlight, duration, offset) {
-		if (!utils.isNumber(postIndex)) {
+		if (!utils.isNumber(postIndex) || !$('#post-container').length) {
 			return;
 		}
 

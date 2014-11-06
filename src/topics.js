@@ -225,8 +225,7 @@ var async = require('async'),
 
 				for (var i=0; i<topics.length; ++i) {
 					if (topics[i]) {
-						topics[i].category = categories[topics[i].cid];
-						topics[i].category.disabled = parseInt(topics[i].category.disabled, 10) === 1;
+						topics[i].category = categories[topics[i].cid] || {};
 						topics[i].user = users[topics[i].uid];
 						topics[i].teaser = results.teasers[i];
 						topics[i].tags = results.tags[i];
@@ -266,6 +265,7 @@ var async = require('async'),
 						}
 
 						pids = topicData.mainPid ? [topicData.mainPid].concat(pids) : pids;
+
 						if (!pids.length) {
 							return next(null, []);
 						}
@@ -278,18 +278,10 @@ var async = require('async'),
 						});
 					});
  				},
-				category: function(next) {
-					Topics.getCategoryData(tid, next);
-				},
-				threadTools: function(next) {
-					plugins.fireHook('filter:topic.thread_tools', [], next);
-				},
-				tags: function(next) {
-					Topics.getTopicTagsObjects(tid, next);
-				},
-				isFollowing: function(next) {
-					Topics.isFollowing(tid, uid, next);
-				}
+				category: async.apply(Topics.getCategoryData, tid),
+				threadTools: async.apply(plugins.fireHook, 'filter:topic.thread_tools', []),
+				tags: async.apply(Topics.getTopicTagsObjects, tid),
+				isFollowing: async.apply(Topics.isFollowing, tid, uid)
 			}, function(err, results) {
 				if (err) {
 					return callback(err);
@@ -357,7 +349,7 @@ var async = require('async'),
 						return next(err);
 					}
 					topics = topics.map(function(topic) {
-						return topic && topic.postcount;
+						return topic && (parseInt(topic.postcount, 10) || 0);
 					});
 
 					next(null, topics);
@@ -409,7 +401,7 @@ var async = require('async'),
 
 					var teasers = tids.map(function(tid, index) {
 						if (tidToPost[tid]) {
-							tidToPost[tid].index = results.counts[index] + 1;
+							tidToPost[tid].index = results.counts[index];
 						}
 						return tidToPost[tid];
 					});

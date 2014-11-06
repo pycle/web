@@ -115,10 +115,14 @@ Sockets.init = function(server) {
 		var hs = socket.handshake,
 			sessionID, uid;
 
+		if (!hs) {
+			return;
+		}
+
 		// Validate the session, if present
 		socketCookieParser(hs, {}, function(err) {
 			if(err) {
-				winston.error(err.message);
+				return winston.error(err.message);
 			}
 
 			sessionID = socket.handshake.signedCookies['express.sid'];
@@ -214,7 +218,10 @@ Sockets.init = function(server) {
 				}, Namespaces);
 
 			if(!methodToCall) {
-				return winston.warn('[socket.io] Unrecognized message: ' + payload.name);
+				if (process.env.NODE_ENV === 'development') {
+					winston.warn('[socket.io] Unrecognized message: ' + payload.name);
+				}
+				return;
 			}
 
 			if (Namespaces[namespace].before) {
@@ -352,6 +359,11 @@ Sockets.reqFromSocket = function(socket) {
 
 Sockets.isUserOnline = isUserOnline;
 function isUserOnline(uid) {
+	if (!io) {
+		// Special handling for install script (socket.io not initialised)
+		return false;
+	}
+
 	return Array.isArray(io.sockets.manager.rooms['/uid_' + uid]);
 }
 

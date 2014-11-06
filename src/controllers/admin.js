@@ -195,7 +195,7 @@ adminController.logs.get = function(req, res, next) {
 		}
 
 		res.render('admin/advanced/logs', {
-			data: data.toString()
+			data: validator.escape(data.toString())
 		});
 	});
 };
@@ -253,6 +253,9 @@ adminController.extend.widgets = function(req, res, next) {
 			plugins.fireHook('filter:widgets.getWidgets', [], next);
 		}
 	}, function(err, widgetData) {
+		if (err) {
+			return next(err);
+		}
 		widgetData.areas.push({ name: 'Draft Zone', template: 'global', location: 'drafts' });
 
 		async.each(widgetData.areas, function(area, next) {
@@ -261,10 +264,13 @@ adminController.extend.widgets = function(req, res, next) {
 				next(err);
 			});
 		}, function(err) {
+			if (err) {
+				return next(err);
+			}
 			for (var w in widgetData.widgets) {
 				if (widgetData.widgets.hasOwnProperty(w)) {
 					// if this gets anymore complicated, it needs to be a template
-					widgetData.widgets[w].content += "<br /><label>Title:</label><input type=\"text\" class=\"form-control\" name=\"title\" placeholder=\"Title (only shown on some containers)\" /><br /><label>Container:</label><textarea rows=\"4\" class=\"form-control container-html\" name=\"container\" placeholder=\"Drag and drop a container or enter HTML here.\"></textarea><div class=\"checkbox\"><label><input name=\"registered-only\" type=\"checkbox\"> Hide from anonymous users?</label></div>";
+					widgetData.widgets[w].content += "<br /><label>Title:</label><input type=\"text\" class=\"form-control\" name=\"title\" placeholder=\"Title (only shown on some containers)\" /><br /><label>Container:</label><textarea rows=\"4\" class=\"form-control container-html\" name=\"container\" placeholder=\"Drag and drop a container or enter HTML here.\"></textarea><div class=\"checkbox\"><label><input name=\"hide-guests\" type=\"checkbox\"> Hide from anonymous users?</label></div><div class=\"checkbox\"><label><input name=\"hide-registered\" type=\"checkbox\"> Hide from registered users?</input></label></div>";
 				}
 			}
 
@@ -335,9 +341,9 @@ adminController.themes.get = function(req, res, next) {
 			var themeConfig = require(path.join(themeDir, 'theme.json')),
 				screenshotPath = path.join(themeDir, themeConfig.screenshot);
 			if (themeConfig.screenshot && fs.existsSync(screenshotPath)) {
-				res.sendfile(screenshotPath);
+				res.sendFile(screenshotPath);
 			} else {
-				res.sendfile(path.join(__dirname, '../../public/images/themes/default.png'));
+				res.sendFile(path.join(__dirname, '../../public/images/themes/default.png'));
 			}
 		} else {
 			return next();

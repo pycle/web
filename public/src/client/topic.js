@@ -64,8 +64,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		paginator.setup('.posts > .post-row', postCount, Topic.toTop, Topic.toBottom, Topic.navigatorCallback, Topic.calculateIndex);
 		handleBookmark(tid);
 
-		socket.on('event:new_post', onNewPost);
-		socket.on('event:new_notification', onNewNotification);
+		setupSocketListeners();
 
 		$(window).on('scroll', updateTopicTitle);
 
@@ -78,6 +77,13 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 		socket.emit('topics.enter', tid);
 	};
+
+	function setupSocketListeners() {
+		socket.removeListener('event:new_post', onNewPost);
+		socket.removeListener('event:new_notification', onNewNotification);
+		socket.on('event:new_post', onNewPost);
+		socket.on('event:new_notification', onNewNotification);
+	}
 
 	Topic.toTop = function() {
 		paginator.scrollTop(0);
@@ -141,7 +147,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 	function onNewPost(data) {
 		var tid = ajaxify.variables.get('topic_id');
-		if(data && data.posts && data.posts.length && data.posts[0].tid !== tid) {
+		if(data && data.posts && data.posts.length && parseInt(data.posts[0].tid, 10) !== parseInt(tid, 10)) {
 			return;
 		}
 
@@ -298,7 +304,7 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 		function findInsertionPoint() {
 			var firstPostTimestamp = parseInt(data.posts[0].timestamp, 10);
 			var firstPostVotes = parseInt(data.posts[0].votes, 10);
-			var firstPostPid = data.posts[0].pid;
+			var firstPostIndex = parseInt(data.posts[0].index, 10);
 
 			var firstReply = $('#post-container li.post-row[data-index!="0"]').first();
 			var lastReply = $('#post-container li.post-row[data-index!="0"]').last();
@@ -321,9 +327,9 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 				} else if(firstPostVotes < parseInt(firstReply.attr('data-votes'), 10)) {
 					after = lastReply;
 				} else {
-					if (firstPostPid > firstReply.attr('data-pid')) {
+					if (firstPostIndex > parseInt(firstReply.attr('data-index'), 10)) {
 						before = firstReply;
-					} else if(firstPostPid <= firstReply.attr('data-pid')) {
+					} else if(firstPostIndex <= parseInt(firstReply.attr('data-index'), 10)) {
 						after = lastReply;
 					}
 				}
@@ -427,8 +433,12 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 	function toggleModTools(pid, privileges) {
 		var postEl = $('.post-row[data-pid="' + pid + '"]');
 
-		postEl.find('.edit, .delete').toggleClass('hidden', !privileges.editable);
-		postEl.find('.move').toggleClass('hidden', !privileges.move);
+		if (!privileges.editable) {
+			postEl.find('.edit, .delete, .purge').remove();
+		}
+		if (!privileges.move) {
+			postEl.find('.move').remove();
+		}
 		postEl.find('.reply, .quote').toggleClass('hidden', !$('.post_reply').length);
 		var isSelfPost = parseInt(postEl.attr('data-uid'), 10) === parseInt(app.uid, 10);
 		postEl.find('.chat, .flag').toggleClass('hidden', isSelfPost || !app.uid);
