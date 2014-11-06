@@ -12,17 +12,17 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		count;
 
 	
-	
 	paginator.init = function() {
 		ui = {
 			frame: $('#frame'),
 			content: $('#content'),
 			scrollbar: $('#scrollbar'),
 			handle: $('#scrollbar .handle'),
-			pagination: $('#pagination')
+			pagination: $('#pagination'),
+			window: $(window)
 		};
 
-		$(window).on('resize action:ajaxify.end', function() {
+		ui.window.on('resize action:ajaxify.end', function() {
 			paginator.update();
 		});
 
@@ -38,7 +38,12 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			hideScrollbar();
 		});
 
+		ui.pagination.addClass('hidden');
 		hideScrollbar();
+
+		ui.window.on('action:ajaxify.start', function() {
+			ui.pagination.addClass('hidden');
+		});
 	};
 
 	// duration deprecated
@@ -79,6 +84,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	paginator.setCount = function(value) {
 		count = parseInt(value, 10);
+		ui.pagination.removeClass('hidden');
 		updateTextAndProgressBar();
 	};
 
@@ -113,7 +119,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		paginator.disableForwardLoading = false;
 		paginator.disableReverseLoading = false;
 
-		$(window).on('scroll', paginator.update);
+		ui.window.on('scroll', paginator.update);
 		paginator.setCount(count);
 
 		paginator.update();
@@ -228,8 +234,8 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	}
 
 	function elementInView(el, orPastDirection) {
-		var scrollTop = $(window).scrollTop() + $('#header-menu').height();
-		var scrollBottom = scrollTop + $(window).height();
+		var scrollTop = ui.window.scrollTop() + $('#header-menu').height();
+		var scrollBottom = scrollTop + ui.window.height();
 
 		var elTop = el.offset().top;
 		var elBottom = elTop + Math.floor(el.height());
@@ -295,7 +301,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		clearTimeout(animationTimeout);
 		animationTimeout = setTimeout(function() {
 			ui.scrollbar.addClass('translucent');
-			$(window).trigger('action:paginator.hide');
+			ui.window.trigger('action:paginator.hide');
 		}, 1000);
 	}
 
