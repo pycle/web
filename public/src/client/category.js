@@ -304,17 +304,16 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 		});
 	};
 
-	Category.loadMoreTopics = function(direction) {
+	Category.loadMoreTopics = function(direction, after, callback) {
 		if (!$('#topics-container').length || !$('#topics-container').children().length) {
 			return;
 		}
 
-		infinitescroll.calculateAfter(direction, '#topics-container .category-item[data-tid]', config.topicsPerPage, false, function(after, offset, el) {
-			loadTopicsAfter(after, function() {
-				if (direction < 0 && el) {
-					Category.scrollToTopic(el.attr('data-tid'), null, 0, offset);
-				}
-			});
+		loadTopicsAfter(after, direction, function() {
+			// I'm not sure what this does, ask baris - andrew
+			/*if (direction < 0 && el) {
+				Category.scrollToTopic(el.attr('data-tid'), null, 0, offset);
+			}*/
 		});
 	};
 
