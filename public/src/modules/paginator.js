@@ -38,7 +38,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			hideScrollbar();
 		});
 
-		ui.pagination.addClass('hidden');
 		hideScrollbar();
 
 		ui.window.on('action:ajaxify.start', function() {
