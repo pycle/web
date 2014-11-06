@@ -352,9 +352,11 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function snapHandleToPage(mousePos) {
 		var numPages = Math.ceil(count / config.postsPerPage),
-			pixelsPerPage = (ui.frame.height() - ui.handle.height()) / numPages,
+			maxHeight = ui.frame.height() - ui.handle.height(),
+			pixelsPerPage = maxHeight / numPages,
 			nearestPoint = Math.round(mousePos / pixelsPerPage) * pixelsPerPage;
 
+		nearestPoint = Math.min(Math.max(pixelsPerPage, nearestPoint), maxHeight);
 		page = parseInt(nearestPoint / pixelsPerPage, 10);
 
 		moveHandle(nearestPoint);
