@@ -7,9 +7,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		ui = {},
 		active = false,
 		animationTimeout = null,
-		index,
+		index, previousIndex,
 		page,
-		count;
+		count = null;
 
 	
 	paginator.init = function() {
@@ -22,9 +22,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			window: $(window)
 		};
 
-		ui.window.on('resize action:ajaxify.end', function() {
-			paginator.update();
+		ui.window.on('action:ajaxify.start', function() {
+			count = null;
+			ui.pagination.addClass('hidden');
 		});
+
+		ui.window.on('action:ajaxify.end resize', paginator.update);
+		ui.frame.scroll(paginator.update);
 
 		ui.scrollbar.on('mouseout', hideScrollbar);
 		ui.scrollbar.on('mouseover', showScrollbar);
@@ -39,10 +43,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		});
 
 		hideScrollbar();
-
-		ui.window.on('action:ajaxify.start', function() {
-			ui.pagination.addClass('hidden');
-		});
 	};
 
 	// duration deprecated
@@ -118,14 +118,15 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		paginator.disableForwardLoading = false;
 		paginator.disableReverseLoading = false;
 
-		ui.window.on('scroll', paginator.update);
 		paginator.setCount(count);
-
 		paginator.update();
 	};
 
-	var previousIndex;
-	paginator.update = function() {
+	paginator.update = function(ev) {
+		if (count === null) {
+			return updateScrollbar();
+		}
+
 		var elements = $(paginator.selector).get();
 
 		if (index > count / 2) {
@@ -151,8 +152,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			}
 		});
 
-		// might be best to only call this on new post
-		updateScrollbar();
+		updatePaginatedScrollbar();
 	};
 
 
@@ -161,8 +161,6 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		
 
 		ui.frame.scroll(function(ev) {
-			paginator.update();
-
 			var curPos = ui.frame.scrollTop(),
 				el, startLoadingAt;
 
@@ -208,6 +206,14 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function updateScrollbar() {
 		var frameHeight = ui.frame.height(),
+			percentScrolled = ui.frame.scrollTop() / (ui.content.height() - frameHeight),
+			handleTop = Math.min(percentScrolled * (frameHeight - ui.handle.height() / 2), frameHeight - ui.handle.height());
+
+		moveHandle(handleTop);
+	}
+
+	function updatePaginatedScrollbar() {
+		var frameHeight = ui.frame.height(),
 			heightPerElement = ui.content.height() / $(paginator.selector).length,
 			totalArea = count * heightPerElement,
 
@@ -215,11 +221,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			scrolledRatio = ui.frame.scrollTop() / totalArea,
 			handleTop = Math.min(scrolledRatio * (frameHeight - ui.handle.height() / 2) + areaMissingAtTop / totalArea * frameHeight, frameHeight - ui.handle.height());
 
-		ui.handle.css({
-			'transform': 'translate3d(0,' + handleTop + 'px, 0)',
-			'-moz-transform': 'translate3d(0,' + handleTop + 'px, 0)',
-			'-o-transform': 'translate3d(0,' + handleTop + 'px, 0)'
-		});
+		moveHandle(handleTop);
 	}
 
 	function generateUrl(index) {
@@ -232,22 +234,14 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		ui.pagination.translateHtml('[[global:pagination.out_of, ' + index + ', ' + count + ']]');
 	}
 
-	function elementInView(el, orPastDirection) {
-		var scrollTop = ui.window.scrollTop() + $('#header-menu').height();
-		var scrollBottom = scrollTop + ui.window.height();
+	function elementInView(el) {
+		var scrollTop = ui.window.scrollTop() + $('#header-menu').height(),
+			scrollBottom = scrollTop + ui.window.height();
 
-		var elTop = el.offset().top;
-		var elBottom = elTop + Math.floor(el.height());
-		if (orPastDirection) {
-			if (orPastDirection === 1) {
-				return scrollBottom >= elTop;
-			} else {
-				return elBottom <= scrollTop;
-			}
-		} else {
-			return (elTop >= scrollTop && elBottom <= scrollBottom) || (elTop <= scrollTop && elBottom >= scrollTop);	
-		}
-		
+		var elTop = el.offset().top,
+			elBottom = elTop + Math.floor(el.height());
+
+		return (elTop >= scrollTop && elBottom <= scrollBottom) || (elTop <= scrollTop && elBottom >= scrollTop);	
 	}
 
 	function scrollToPid(postIndex, highlight, duration, offset) {
@@ -264,6 +258,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 				scrollTop: (scrollTo.offset().top - ui.content.offset().top - offset) + 'px'
 			}, duration, function() {
 				if (done) {
+					// check here if this ever gets called?
 					return;
 				}
 				done = true;
