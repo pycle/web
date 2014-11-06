@@ -1,15 +1,11 @@
 "use strict";
 
-/* globals app, define, utils, config, ajaxify, Sly */
+/*globals app, define, utils, config, ajaxify*/
 
 define('paginator', ['forum/pagination'], function(pagination) {
-	var paginator = {
-			active: false
-		},
-		frame,
-		content,
-		scrollbar,
-		handle,
+	var paginator = {},
+		ui = {},
+		active = false,
 		animationTimeout = null,
 		index,
 		page,
@@ -18,23 +14,26 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	
 	
 	paginator.init = function() {
-		frame = $('#frame');
-		content = $('#content');
-		scrollbar = $('#scrollbar');
-		handle = scrollbar.find('.handle');
+		ui = {
+			frame: $('#frame'),
+			content: $('#content'),
+			scrollbar: $('#scrollbar'),
+			handle: $('#scrollbar .handle'),
+			pagination: $('#pagination')
+		};
 
 		$(window).on('resize action:ajaxify.end', function() {
 			paginator.update();
 		});
 
-		scrollbar.on('mouseout', hideScrollbar);
-		scrollbar.on('mouseover', showScrollbar);
+		ui.scrollbar.on('mouseout', hideScrollbar);
+		ui.scrollbar.on('mouseover', showScrollbar);
 
-		handle.on('mousedown touchstart', activatePagination);
+		ui.handle.on('mousedown touchstart', activatePagination);
 		$('body').on('mouseup touchend', deactivatePagination);
 		$('body').on('mousemove touchmove', paginate);
 
-		frame.on('scroll', function() {
+		ui.frame.on('scroll', function() {
 			showScrollbar();
 			hideScrollbar();
 		});
@@ -153,13 +152,13 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 
 	paginator.onScroll = function(cb) {
-		var prevPos = frame.scrollTop();
+		var prevPos = ui.frame.scrollTop();
 		
 
-		frame.scroll(function(ev) {
+		ui.frame.scroll(function(ev) {
 			paginator.update();
 
-			var curPos = frame.scrollTop(),
+			var curPos = ui.frame.scrollTop(),
 				el, startLoadingAt;
 
 			if (!paginator.disableForwardLoading && parseInt($($(paginator.selector).get(-1)).attr('data-index'), 10) === count) {
@@ -193,7 +192,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 						var slide = $('#content').height() - originalSize;						
 						paginator.update();
 
-						frame.scrollTop(slide + frame.scrollTop());
+						ui.frame.scrollTop(slide + ui.frame.scrollTop());
 					});
 				}
 			}
@@ -203,15 +202,15 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	};
 
 	function updateScrollbar() {
-		var frameHeight = frame.height(),
-			heightPerElement = content.height() / $(paginator.selector).length,
+		var frameHeight = ui.frame.height(),
+			heightPerElement = ui.content.height() / $(paginator.selector).length,
 			totalArea = count * heightPerElement,
 
 			areaMissingAtTop = (parseInt($($(paginator.selector).get(1)).attr('data-index'), 10) - 1) * heightPerElement,
-			scrolledRatio = frame.scrollTop() / totalArea,
-			handleTop = Math.min(scrolledRatio * (frameHeight - handle.height() / 2) + areaMissingAtTop / totalArea * frameHeight, frameHeight - handle.height());
+			scrolledRatio = ui.frame.scrollTop() / totalArea,
+			handleTop = Math.min(scrolledRatio * (frameHeight - ui.handle.height() / 2) + areaMissingAtTop / totalArea * frameHeight, frameHeight - ui.handle.height());
 
-		handle.css({
+		ui.handle.css({
 			'transform': 'translate3d(0,' + handleTop + 'px, 0)',
 			'-moz-transform': 'translate3d(0,' + handleTop + 'px, 0)',
 			'-o-transform': 'translate3d(0,' + handleTop + 'px, 0)'
@@ -225,7 +224,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 	function updateTextAndProgressBar() {
 		index = index > count ? count : index;
-		$('#pagination').translateHtml('[[global:pagination.out_of, ' + index + ', ' + count + ']]');
+		ui.pagination.translateHtml('[[global:pagination.out_of, ' + index + ', ' + count + ']]');
 	}
 
 	function elementInView(el, orPastDirection) {
@@ -257,7 +256,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		var done = false;
 		function animateScroll() {
 			$('#frame').animate({
-				scrollTop: (scrollTo.offset().top - content.offset().top - offset) + 'px'
+				scrollTop: (scrollTo.offset().top - ui.content.offset().top - offset) + 'px'
 			}, duration, function() {
 				if (done) {
 					return;
@@ -289,31 +288,31 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	}
 
 	function hideScrollbar() {
-		if (paginator.active) {
+		if (active) {
 			return;
 		}
 
 		clearTimeout(animationTimeout);
 		animationTimeout = setTimeout(function() {
-			scrollbar.addClass('translucent');
+			ui.scrollbar.addClass('translucent');
 			$(window).trigger('action:paginator.hide');
 		}, 1000);
 	}
 
 	function showScrollbar() {
 		clearTimeout(animationTimeout);
-		scrollbar.removeClass('translucent');
+		ui.scrollbar.removeClass('translucent');
 	}
 
 	function activatePagination() {
 		$('body').addClass('paginating');
-		paginator.active = true;
+		active = true;
 		showScrollbar();
 	}
 
 	function deactivatePagination() {
 		$('body').removeClass('paginating');
-		paginator.active = false;
+		active = false;
 		hideScrollbar();
 		updateTextAndProgressBar();
 
@@ -327,7 +326,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 	}
 
 	function paginate(ev) {
-		if (!paginator.active) {
+		if (!active) {
 			return;
 		}
 
@@ -339,23 +338,23 @@ define('paginator', ['forum/pagination'], function(pagination) {
 
 		var mouseY = touches ? touches[0].clientY : ev.pageY;
 
-		var mousePos = mouseY - scrollbar.offset().top - (handle.height() / 2);
+		var mousePos = mouseY - ui.scrollbar.offset().top - (ui.handle.height() / 2);
 		snapHandleToPage(mousePos);
 	}
 
 	function snapHandleToPage(mousePos) {
 		var numPages = Math.ceil(count / config.postsPerPage),
-			pixelsPerPage = (frame.height() - handle.height()) / numPages,
+			pixelsPerPage = (ui.frame.height() - ui.handle.height()) / numPages,
 			nearestPoint = Math.round(mousePos / pixelsPerPage) * pixelsPerPage;
 
 		page = parseInt(nearestPoint / pixelsPerPage, 10);
 
 		moveHandle(nearestPoint);
-		$('#pagination').translateHtml('[[global:pagination.page_out_of, ' + page + ', ' + numPages + ']]');
+		ui.pagination.translateHtml('[[global:pagination.page_out_of, ' + page + ', ' + numPages + ']]');
 	}
 
 	function moveHandle(pos) {
-		handle.css({
+		ui.handle.css({
 			'transform': 'translate3d(0,' + pos + 'px, 0)',
 			'-moz-transform': 'translate3d(0,' + pos + 'px, 0)',
 			'-o-transform': 'translate3d(0,' + pos + 'px, 0)'
