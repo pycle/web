@@ -55,7 +55,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		duration = duration !== undefined ? duration : 400;
 		paginator.scrollActive = true;
 
-		if($('#post_anchor_' + postIndex).length && !utils.isMobile()) {
+		if($('#post_anchor_' + postIndex).length/* && !utils.isMobile()*/) {
 			return scrollToPid(postIndex, highlight, duration, offset);
 		}
 
