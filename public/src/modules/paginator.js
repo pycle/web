@@ -330,7 +330,7 @@ define('paginator', ['forum/pagination'], function(pagination) {
 			return;
 		}
 
-		var ev = ev || window.event;
+		ev = window.event || ev;
 
 		var touches = ev.touches ? ev.touches : null;
 
