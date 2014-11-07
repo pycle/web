@@ -2,7 +2,8 @@
 'use strict';
 
 var winston = require('winston'),
-	db = require('../database');
+	db = require('../database'),
+	pkg = require('../../package.json');
 
 module.exports = function(Meta) {
 
@@ -25,7 +26,9 @@ module.exports = function(Meta) {
 
 	Meta.configs.list = function (callback) {
 		db.getObject('config', function (err, config) {
-			callback(err, config || {});
+			config = config || {};
+			config.version = pkg.version;
+			callback(err, config);
 		});
 	};
 
