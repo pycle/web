@@ -460,16 +460,10 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 			return;
 		}
 
-		var indicatorEl = $('.loading-indicator');
-		if (!indicatorEl.is(':animated')) {
-			indicatorEl.fadeIn();
-		}
-
 		infinitescroll.loadMore('topics.loadMore', {
 			tid: tid,
 			after: after
 		}, function (data, done) {
-			indicatorEl.fadeOut();
 			data.direction = direction;
 
 			if (data && data.posts && data.posts.length) {
