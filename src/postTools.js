@@ -67,6 +67,8 @@ var winston = require('winston'),
 						title = title.trim();
 
 						var topicData = {
+							tid: tid,
+							mainPid: pid,
 							title: title,
 							slug: tid + '/' + utils.slugify(title)
 						};
@@ -75,7 +77,7 @@ var winston = require('winston'),
 						}
 
 						db.setObject('topic:' + tid, topicData, function(err) {
-							plugins.fireHook('action:topic.edit', tid);
+							plugins.fireHook('action:topic.edit', topicData);
 						});
 
 						topics.updateTags(tid, options.tags, function(err) {

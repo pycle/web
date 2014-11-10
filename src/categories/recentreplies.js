@@ -15,7 +15,7 @@ module.exports = function(Categories) {
 			return callback(null, []);
 		}
 
-		db.getSortedSetRevRange('categories:recent_posts:cid:' + cid, 0, count - 1, function(err, pids) {
+		db.getSortedSetRevRange('cid:' + cid + ':pids', 0, count - 1, function(err, pids) {
 			if (err || !pids || !pids.length) {
 				return callback(err, []);
 			}
@@ -29,6 +29,9 @@ module.exports = function(Categories) {
 			return callback(null, []);
 		}
 		async.map(categoryData, getRecentTopicPids, function(err, results) {
+			if (err) {
+				return callback(err);
+			}
 
 			var pids = _.flatten(results);
 
@@ -41,21 +44,21 @@ module.exports = function(Categories) {
 					return callback(err);
 				}
 
-				async.each(categoryData, function(category, next) {
-					assignPostsToCategory(category, posts, next);
-				}, callback);
+				categoryData.forEach(function(category) {
+					assignPostsToCategory(category, posts);
+				});
+
+				callback();
 			});
 		});
 	};
 
-	function assignPostsToCategory(category, posts, next) {
+	function assignPostsToCategory(category, posts) {
 		category.posts = posts.filter(function(post) {
 			return parseInt(post.category.cid, 10) === parseInt(category.cid, 10);
 		}).sort(function(a, b) {
 			return b.timestamp - a.timestamp;
 		}).slice(0, parseInt(category.numRecentReplies, 10));
-
-		next();
 	}
 
 	function getRecentTopicPids(category, callback) {
@@ -64,7 +67,7 @@ module.exports = function(Categories) {
 			return callback(null, []);
 		}
 
-		db.getSortedSetRevRange('categories:recent_posts:cid:' + category.cid, 0, 0, function(err, pids) {
+		db.getSortedSetRevRange('cid:' + category.cid + ':pids', 0, 0, function(err, pids) {
 			if (err || !Array.isArray(pids) || !pids.length) {
 				return callback(err, []);
 			}
@@ -75,10 +78,10 @@ module.exports = function(Categories) {
 
 			async.parallel({
 				pinnedTids: function(next) {
-					db.getSortedSetRevRangeByScore('categories:' + category.cid + ':tid', 0, -1, Infinity, Date.now(), next);
+					db.getSortedSetRevRangeByScore('cid:' + category.cid + ':tids', 0, -1, '+inf', Date.now(), next);
 				},
 				tids: function(next) {
-					db.getSortedSetRevRangeByScore('categories:' + category.cid + ':tid', 0, Math.max(0, count), Date.now(), 0, next);
+					db.getSortedSetRevRangeByScore('cid:' + category.cid + ':tids', 0, Math.max(0, count), Date.now(), 0, next);
 				}
 			}, function(err, results) {
 				if (err) {
@@ -140,10 +143,10 @@ module.exports = function(Categories) {
 
 					async.parallel([
 						function(next) {
-							db.sortedSetRemove('categories:recent_posts:cid:' + oldCid, movePids, next);
+							db.sortedSetRemove('cid:' + oldCid + ':pids', movePids, next);
 						},
 						function(next) {
-							db.sortedSetAdd('categories:recent_posts:cid:' + cid, timestamps, movePids, next);
+							db.sortedSetAdd('cid:' + cid + ':pids', timestamps, movePids, next);
 						}
 					], function(err) {
 						if (err) {

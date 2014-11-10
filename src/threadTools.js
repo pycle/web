@@ -32,8 +32,8 @@ var winston = require('winston'),
 	};
 
 	function toggleDelete(tid, uid, isDelete, callback) {
-		topics.getTopicFields(tid, ['cid', 'deleted'], function(err, topicData) {
-			if(err) {
+		topics.getTopicFields(tid, ['tid', 'cid', 'deleted', 'title', 'mainPid'], function(err, topicData) {
+			if (err) {
 				return callback(err);
 			}
 
@@ -49,13 +49,16 @@ var winston = require('winston'),
 						isDelete: isDelete
 					});
 				}
-				if(err) {
+				if (err) {
 					return callback(err);
 				}
 
 				ThreadTools[isDelete ? 'lock' : 'unlock'](tid);
-
-				plugins.fireHook(isDelete ? 'action:topic.delete' : 'action:topic.restore', tid);
+				if (isDelete) {
+					plugins.fireHook('action:topic.delete', tid);
+				} else {
+					plugins.fireHook('action:topic.restore', topicData);
+				}
 
 				events[isDelete ? 'logTopicDelete' : 'logTopicRestore'](uid, tid);
 
@@ -131,12 +134,10 @@ var winston = require('winston'),
 			emitTo('topic_' + tid);
 			emitTo('category_' + cid);
 
-			if (typeof callback === 'function') {
-				callback(null, {
-					tid: tid,
-					isLocked: lock
-				});
-			}
+			callback(null, {
+				tid: tid,
+				isLocked: lock
+			});
 		});
 	}
 
@@ -149,7 +150,7 @@ var winston = require('winston'),
 	};
 
 	function togglePin(tid, uid, pin, callback) {
-		topics.getTopicField(tid, 'cid', function(err, cid) {
+		topics.getTopicFields(tid, ['cid', 'lastposttime'], function(err, topicData) {
 			function emitTo(room) {
 				websockets.in(room).emit(pin ? 'event:topic_pinned' : 'event:topic_unpinned', {
 					tid: tid,
@@ -162,9 +163,7 @@ var winston = require('winston'),
 			}
 
 			topics.setTopicField(tid, 'pinned', pin ? 1 : 0);
-			topics.getTopicFields(tid, ['cid', 'lastposttime'], function(err, topicData) {
-				db.sortedSetAdd('categories:' + topicData.cid + ':tid', pin ? Math.pow(2, 53) : topicData.lastposttime, tid);
-			});
+			db.sortedSetAdd('cid:' + topicData.cid + ':tids', pin ? Math.pow(2, 53) : topicData.lastposttime, tid);
 
 			plugins.fireHook('action:topic.pin', {
 				tid: tid,
@@ -173,14 +172,12 @@ var winston = require('winston'),
 			});
 
 			emitTo('topic_' + tid);
-			emitTo('category_' + cid);
+			emitTo('category_' + topicData.cid);
 
-			if (typeof callback === 'function') {
-				callback(null, {
-					tid: tid,
-					isPinned: pin
-				});
-			}
+			callback(null, {
+				tid: tid,
+				isPinned: pin
+			});
 		});
 	}
 
@@ -192,11 +189,11 @@ var winston = require('winston'),
 			},
 			function(topicData, next) {
 				topic = topicData;
-				db.sortedSetRemove('categories:' + topicData.cid + ':tid', tid, next);
+				db.sortedSetRemove('cid:' + topicData.cid + ':tids', tid, next);
 			},
 			function(next) {
 				var timestamp = parseInt(topic.pinned, 10) ? Math.pow(2, 53) : topic.lastposttime;
-				db.sortedSetAdd('categories:' + cid + ':tid', timestamp, tid, next);
+				db.sortedSetAdd('cid:' + cid + ':tids', timestamp, tid, next);
 			}
 		], function(err) {
 			if (err) {
