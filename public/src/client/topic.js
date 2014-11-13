@@ -375,8 +375,6 @@ define('forum/topic', dependencies, function(pagination, infinitescroll, threadT
 
 			addBlockquoteEllipses(html.find('.post-content > blockquote'));
 
-			debug();
-
 			$(window).trigger('action:posts.loaded');
 			onNewPostsLoaded(html, data.posts);
 			callback(true);
