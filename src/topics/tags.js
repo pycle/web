@@ -49,7 +49,7 @@ module.exports = function(Topics) {
 		}
 		tag = tag.trim().toLowerCase();
 		tag = tag.replace(/[,\/#!$%\^\*;:{}=_`<>'"~()?\|]/g, '');
-		tag = tag.substr(0, meta.config.maximumTagLength || 15);
+		tag = tag.substr(0, meta.config.maximumTagLength || 15).trim();
 		var matches = tag.match(/^[.-]*(.+?)[.-]*$/);
 		if (matches && matches.length > 1) {
 			tag = matches[1];
@@ -64,7 +64,7 @@ module.exports = function(Topics) {
 	function updateTagCount(tag, callback) {
 		callback = callback || function() {};
 		Topics.getTagTopicCount(tag, function(err, count) {
-			if (!err) {
+			if (!err && count) {
 				db.sortedSetAdd('tags:topic:count', count, tag, callback);
 			}
 		});
@@ -77,6 +77,42 @@ module.exports = function(Topics) {
 	Topics.getTagTopicCount = function(tag, callback) {
 		db.sortedSetCard('tag:' + tag + ':topics', callback);
 	};
+
+	Topics.deleteTags = function(tags, callback) {
+		if (!Array.isArray(tags) || !tags.length) {
+			return callback();
+		}
+
+		async.series([
+			function(next) {
+				removeTagsFromTopics(tags, next);
+			},
+			function(next) {
+				var keys = tags.map(function(tag) {
+					return 'tag:' + tag + ':topics';
+				});
+				db.deleteAll(keys, next);
+			},
+			function(next) {
+				db.sortedSetRemove('tags:topic:count', tags, next);
+			}
+		], callback);
+	};
+
+	function removeTagsFromTopics(tags, callback) {
+		async.eachLimit(tags, 50, function(tag, next) {
+			db.getSortedSetRange('tag:' + tag + ':topics', 0, -1, function(err, tids) {
+				if (err || !tids.length) {
+					return next(err);
+				}
+				var keys = tids.map(function(tid) {
+					return 'topic:' + tid + ':tags';
+				});
+
+				db.setsRemove(keys, tag, next);
+			});
+		}, callback);
+	}
 
 	Topics.deleteTag = function(tag) {
 		db.delete('tag:' + tag + ':topics');

@@ -175,7 +175,7 @@ var	async = require('async'),
 				return callback(new Error('[[error:user-banned]]'));
 			}
 
-			if (userData.email && parseInt(meta.config.requireEmailConfirmation, 10) === 1 && parseInt(userData['email:confirmed'], 10) !== 1) {
+			if (parseInt(meta.config.requireEmailConfirmation, 10) === 1 && parseInt(userData['email:confirmed'], 10) !== 1) {
 				return callback(new Error('[[error:email-not-confirmed]]'));
 			}
 			var now = Date.now();
@@ -186,7 +186,7 @@ var	async = require('async'),
 			var lastposttime = userData.lastposttime || 0;
 
 			if (parseInt(meta.config.newbiePostDelay, 10) > 0 && parseInt(meta.config.newbiePostDelayThreshold, 10) > parseInt(userData.reputation, 10) && now - parseInt(lastposttime, 10) < parseInt(meta.config.newbiePostDelay, 10) * 1000) {
-				return callback(new Error('[[error:too-many-posts-newbie, ' + meta.config.postDelay + ', ' + meta.config.newbiePostDelayThreshold + ']]'));
+				return callback(new Error('[[error:too-many-posts-newbie, ' + meta.config.newbiePostDelay + ', ' + meta.config.newbiePostDelayThreshold + ']]'));
 			} else if (now - parseInt(lastposttime, 10) < parseInt(meta.config.postDelay, 10) * 1000) {
 				return callback(new Error('[[error:too-many-posts, ' + meta.config.postDelay + ']]'));
 			}

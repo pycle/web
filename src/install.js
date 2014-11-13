@@ -442,7 +442,17 @@ function setCopyrightWidget(next) {
 }
 
 install.setup = function (callback) {
-	async.series([checkSetupFlag, checkCIFlag, setupConfig, setupDefaultConfigs, enableDefaultTheme, createAdministrator, createCategories, createWelcomePost, enableDefaultPlugins, setCopyrightWidget,
+	async.series([
+		checkSetupFlag,
+		checkCIFlag,
+		setupConfig,
+		setupDefaultConfigs,
+		enableDefaultTheme,
+		createAdministrator,
+		createCategories,
+		createWelcomePost,
+		enableDefaultPlugins,
+		setCopyrightWidget,
 		function (next) {
 			require('./upgrade').upgrade(next);
 		}

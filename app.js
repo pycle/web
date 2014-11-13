@@ -38,8 +38,11 @@ global.env = process.env.NODE_ENV || 'production';
 winston.remove(winston.transports.Console);
 winston.add(winston.transports.Console, {
 	colorize: true,
-	timestamp: true,
-	level: 'info'
+	timestamp: function() {
+		var date = new Date();
+		return date.getDate() + '/' + (date.getMonth() + 1) + ' ' + date.getHours() + ':' + date.getMinutes() + ' [' + global.process.pid + ']';
+	},
+	level: global.env === 'production' ? 'info' : 'verbose'
 });
 
 // TODO: remove once https://github.com/flatiron/winston/issues/280 is fixed
@@ -90,7 +93,7 @@ function loadConfig() {
 	nconf.defaults({
 		base_dir: __dirname,
 		themes_path: path.join(__dirname, 'node_modules'),
-		upload_url: '/uploads/',
+		upload_url: nconf.get('relative_path') + '/uploads/',
 		views_dir: path.join(__dirname, 'public/templates')
 	});
 

@@ -48,7 +48,8 @@ module.exports = function(Meta) {
 				'public/src/translator.js',
 				'public/src/helpers.js',
 				'public/src/overrides.js'
-			]
+			],
+			rjs: []
 		}
 	};
 
@@ -60,6 +61,10 @@ module.exports = function(Meta) {
 				utils.walk(path.join(rjsPath, 'client'), next);
 			},
 			modules: function(next) {
+				if (global.env === 'development') {
+					return next(null, []);
+				}
+				
 				utils.walk(path.join(rjsPath, 'modules'), next);
 			}
 		}, function(err, rjsFiles) {
@@ -176,7 +181,7 @@ module.exports = function(Meta) {
 				minifier.send({
 					action: 'js',
 					relativePath: nconf.get('url') + '/',
-					minify: minify,
+					minify: global.env !== 'development',
 					scripts: Meta.js.scripts.all
 				});
 			});

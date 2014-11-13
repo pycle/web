@@ -146,7 +146,7 @@ SocketPosts.sendNotificationToPostOwner = function(pid, fromuid, notification) {
 		async.parallel({
 			username: async.apply(user.getUserField, fromuid, 'username'),
 			topicTitle: async.apply(topics.getTopicField, postData.tid, 'title'),
-			postContent: async.apply(postTools.parsePost, postData, postData.uid)
+			postObj: async.apply(postTools.parsePost, postData, postData.uid)
 		}, function(err, results) {
 			if (err) {
 				return;
@@ -154,7 +154,7 @@ SocketPosts.sendNotificationToPostOwner = function(pid, fromuid, notification) {
 
 			notifications.create({
 				bodyShort: '[[' + notification + ', ' + results.username + ', ' + results.topicTitle + ']]',
-				bodyLong: results.postContent,
+				bodyLong: results.postObj.content,
 				pid: pid,
 				nid: 'post:' + pid + ':uid:' + fromuid,
 				from: fromuid
@@ -304,6 +304,9 @@ SocketPosts.flag = function(socket, pid, callback) {
 
 	async.waterfall([
 		function(next) {
+			posts.flag(pid, next);
+		},
+		function(next) {
 			user.getUserFields(socket.uid, ['username', 'reputation'], next);
 		},
 		function(userData, next) {
@@ -323,7 +326,7 @@ SocketPosts.flag = function(socket, pid, callback) {
 		},
 		function(topicTitle, next) {
 			message = '[[notifications:user_flagged_post_in, ' + userName + ', ' + topicTitle + ']]';
-			postTools.parse(post, socket.uid, next);
+			postTools.parsePost(post, socket.uid, next);
 		},
 		function(post, next) {
 			groups.get('administrators', {}, next);
@@ -341,9 +344,6 @@ SocketPosts.flag = function(socket, pid, callback) {
 				}
 				notifications.push(notification, adminGroup.members, next);
 			});
-		},
-		function(next) {
-			posts.flag(pid, next);
 		},
 		function(next) {
 			if (!parseInt(post.uid, 10)) {

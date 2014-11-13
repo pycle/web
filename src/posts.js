@@ -95,18 +95,27 @@ var async = require('async'),
 		});
 	};
 
-	Posts.getPostFields = function(pid, fields, callback) {
-		db.getObjectFields('post:' + pid, fields, function(err, data) {
-			if(err) {
+	Posts.getPostField = function(pid, field, callback) {
+		Posts.getPostFields(pid, [field], function(err, data) {
+			if (err) {
 				return callback(err);
 			}
 
-			// TODO: I think the plugins system needs an optional 'parameters' paramter so I don't have to do this:
-			data = data || {};
-			data.pid = pid;
-			data.fields = fields;
+			callback(null, data[field]);
+		});
+	};
 
-			plugins.fireHook('filter:post.getFields', data, callback);
+	Posts.getPostFields = function(pid, fields, callback) {
+		db.getObjectFields('post:' + pid, fields, function(err, data) {
+			if (err) {
+				return callback(err);
+			}
+
+			data.pid = pid;
+
+			plugins.fireHook('filter:post.getFields', {posts: [data], fields: fields}, function(err, data) {
+				callback(err, (data && Array.isArray(data.posts) && data.posts.length) ? data.posts[0] : null);
+			});
 		});
 	};
 
@@ -119,30 +128,39 @@ var async = require('async'),
 			return 'post:' + pid;
 		});
 
-		db.getObjectsFields(keys, fields, callback);
-	};
-
-	Posts.getPostField = function(pid, field, callback) {
-		Posts.getPostFields(pid, [field], function(err, data) {
-			if(err) {
+		db.getObjectsFields(keys, fields, function(err, posts) {
+			if (err) {
 				return callback(err);
 			}
-
-			callback(null, data[field]);
+			plugins.fireHook('filter:post.getFields', {posts: posts, fields: fields}, function(err, data) {
+				 callback(err, (data && Array.isArray(data.posts)) ? data.posts : null);
+			});
 		});
 	};
 
 	Posts.setPostField = function(pid, field, value, callback) {
-		db.setObjectField('post:' + pid, field, value, callback);
-		plugins.fireHook('action:post.setField', {
-			'pid': pid,
-			'field': field,
-			'value': value
+		db.setObjectField('post:' + pid, field, value, function(err) {
+			if (err) {
+				return callback(err);
+			}
+			var data = {
+				pid: pid
+			};
+			data[field] = value;
+			plugins.fireHook('action:post.setFields', data);
+			callback();
 		});
 	};
 
 	Posts.setPostFields = function(pid, data, callback) {
-		db.setObject('post:' + pid, data, callback);
+		db.setObject('post:' + pid, data, function(err) {
+			if (err) {
+				return callback(err);
+			}
+			data.pid = pid;
+			plugins.fireHook('action:post.setFields', data);
+			callback();
+		});
 	};
 
 	Posts.getPidIndex = function(pid, uid, callback) {

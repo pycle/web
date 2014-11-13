@@ -117,8 +117,12 @@ SocketModules.chats.get = function(socket, data, callback) {
 };
 
 SocketModules.chats.send = function(socket, data, callback) {
-	if(!data) {
+	if (!data) {
 		return callback(new Error('[[error:invalid-data]]'));
+	}
+
+	if (parseInt(meta.config.disableChat) === 1) {
+		return callback(new Error('[[error:chat-disabled]]'));
 	}
 
 	var touid = parseInt(data.touid, 10);
@@ -137,46 +141,50 @@ SocketModules.chats.send = function(socket, data, callback) {
 
 	socket.lastChatMessageTime = now;
 
-	user.getUserField(socket.uid, 'banned', function(err, banned) {
+	user.getUserFields(socket.uid, ['banned', 'email:confirmed'], function(err, userData) {
 		if (err) {
 			return callback(err);
 		}
 
-		if (parseInt(banned, 10) === 1) {
+		if (parseInt(userData.banned, 10) === 1) {
 			return callback(new Error('[[error:user-banned]]'));
 		}
 
+		if (parseInt(meta.config.requireEmailConfirmation, 10) === 1 && parseInt(userData['email:confirmed'], 10) !== 1) {
+			return callback(new Error('[[error:email-not-confirmed]]'));
+		}
+
 		Messaging.canMessage(socket.uid, touid, function(err, allowed) {
-			if (allowed) {
-				Messaging.addMessage(socket.uid, touid, msg, function(err, message) {
-					if (err) {
-						return callback(err);
-					}
-
-					Messaging.notifyUser(socket.uid, touid, message);
-
-					// Recipient
-					SocketModules.chats.pushUnreadCount(touid);
-					server.in('uid_' + touid).emit('event:chats.receive', {
-						withUid: socket.uid,
-						message: message,
-						self: 0
-					});
-
-					// Sender
-					SocketModules.chats.pushUnreadCount(socket.uid);
-					server.in('uid_' + socket.uid).emit('event:chats.receive', {
-						withUid: touid,
-						message: message,
-						self: 1
-					});
-
-					callback();
-				});
-			} else {
-				callback(new Error('[[error:chat-restricted]]'))
+			if (err || !allowed) {
+				return callback(err || new Error('[[error:chat-restricted]]'));
 			}
-		})
+
+			Messaging.addMessage(socket.uid, touid, msg, function(err, message) {
+				if (err) {
+					return callback(err);
+				}
+
+				Messaging.notifyUser(socket.uid, touid, message);
+
+				// Recipient
+				SocketModules.chats.pushUnreadCount(touid);
+				server.in('uid_' + touid).emit('event:chats.receive', {
+					withUid: socket.uid,
+					message: message,
+					self: 0
+				});
+
+				// Sender
+				SocketModules.chats.pushUnreadCount(socket.uid);
+				server.in('uid_' + socket.uid).emit('event:chats.receive', {
+					withUid: touid,
+					message: message,
+					self: 1
+				});
+
+				callback();
+			});
+		});
 	});
 };
 

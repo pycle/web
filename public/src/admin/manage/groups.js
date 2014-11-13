@@ -8,24 +8,18 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 		var yourid = ajaxify.variables.get('yourid'),
 			createModal = $('#create-modal'),
 			createGroupName = $('#create-group-name'),
-			create = $('#create'),
 			createModalGo = $('#create-modal-go'),
-			createGroupDesc = $('#create-group-desc'),
 			createModalError = $('#create-modal-error'),
 			groupDetailsModal = $('#group-details-modal'),
 			groupDetailsSearch = $('#group-details-search'),
 			groupDetailsSearchResults = $('#group-details-search-results'),
 			groupMembersEl = $('ul.current_members'),
-			formEl = groupDetailsModal.find('form'),
 			detailsModalSave = $('#details-modal-save'),
-			groupsList = $('#groups-list'),
 			groupIcon = $('#group-icon'),
-			changeGroupIcon = $('#change-group-icon'),
 			changeGroupName = $('#change-group-name'),
 			changeGroupDesc = $('#change-group-desc'),
 			changeGroupUserTitle = $('#change-group-user-title'),
 			changeGroupLabelColor = $('#change-group-label-color'),
-			groupIcon = $('#group-icon'),
 			groupLabelPreview = $('#group-label-preview'),
 			searchDelay;
 
@@ -33,16 +27,12 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 		$('#groups-list .members li').tooltip();
 
 		createModal.on('keypress', function(e) {
-			switch(e.keyCode) {
-				case 13:
-					createModalGo.click();
-					break;
-				default:
-					break;
+			if (e.keyCode === 13) {
+				createModalGo.click();
 			}
 		});
 
-		create.on('click', function() {
+		$('#create').on('click', function() {
 			createModal.modal('show');
 			setTimeout(function() {
 				createGroupName.focus();
@@ -52,7 +42,7 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 		createModalGo.on('click', function() {
 			var submitObj = {
 					name: createGroupName.val(),
-					description: createGroupDesc.val()
+					description: $('#create-group-desc').val()
 				},
 				errorText;
 
@@ -75,20 +65,16 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 					createModalError.addClass('hide');
 					createGroupName.val('');
 					createModal.on('hidden.bs.modal', function() {
-						ajaxify.go('admin/groups');
+						ajaxify.go('admin/manage/groups');
 					});
 					createModal.modal('hide');
 				}
 			});
 		});
 
-		formEl.keypress(function(e) {
-			switch(e.keyCode) {
-				case 13:
-					detailsModalSave.click();
-					break;
-				default:
-					break;
+		groupDetailsModal.find('form').keypress(function(e) {
+			if (e.keyCode === 13) {
+				detailsModalSave.click();
 			}
 		});
 
@@ -101,10 +87,10 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 		changeGroupLabelColor.keydown(function() {
 			setTimeout(function() {
 				groupLabelPreview.css('background', changeGroupLabelColor.val() || '#000000');
-			}, 0);	
+			}, 0);
 		});
 
-		groupsList.on('click', 'button[data-action]', function() {
+		$('#groups-list').on('click', 'button[data-action]', function() {
 			var el = $(this),
 				action = el.attr('data-action'),
 				groupName = el.parents('li[data-groupname]').attr('data-groupname');
@@ -118,7 +104,7 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 								return app.alertError(err.message);
 							}
 
-							ajaxify.go('admin/groups');
+							ajaxify.go('admin/manage/groups');
 						});
 					}
 				});
@@ -229,7 +215,7 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 			});
 		});
 
-		changeGroupIcon.on('click', function() {
+		$('#change-group-icon').on('click', function() {
 			iconSelect.init(groupIcon);
 		});
 
@@ -250,7 +236,7 @@ define('admin/manage/groups', ['admin/modules/iconSelect'], function(iconSelect)
 			}, function(err) {
 				if (!err) {
 					groupDetailsModal.on('hidden.bs.modal', function() {
-						ajaxify.go('admin/groups');
+						ajaxify.go('admin/manage/groups');
 					});
 					groupDetailsModal.modal('hide');
 				}
