@@ -100,41 +100,37 @@ if(nconf.get('ssl')) {
 		winston.info('Using ports 80 and 443 is not recommend; use a proxy instead. See README.md');
 	}
 
-	module.exports.server = server;
-	module.exports.init = function(callback) {
-		server.on("error", function(err){
-			winston.error(err.stack);
-			console.log(err.stack);
-			if (err.code === 'EADDRINUSE') {
-				winston.error('NodeBB address in use, exiting...');
-				if (cluster.isWorker) {
-					cluster.worker.kill();
-				} else {
-					process.exit(0);
-				}
+	server.on('error', function(err) {
+		winston.error(err.stack);
+		console.log(err.stack);
+		if (err.code === 'EADDRINUSE') {
+			winston.error('NodeBB address in use, exiting...');
+			if (cluster.isWorker) {
+				cluster.worker.kill();
 			} else {
-				throw err;
+				process.exit(0);
 			}
-		});
-
-		emitter.all(['templates:compiled', 'meta:js.compiled', 'meta:css.compiled'], function() {
-			winston.info('NodeBB Ready');
-			emitter.emit('nodebb:ready');
-			emitter.removeAllListeners('templates:compiled').removeAllListeners('meta:js.compiled').removeAllListeners('meta:css.compiled');
-		});
-
-		if (process.send) {
-			callback();
 		} else {
-			module.exports.listen();
+			throw err;
 		}
-	};
+	});
+
+	module.exports.server = server;
+
+	emitter.all(['templates:compiled', 'meta:js.compiled', 'meta:css.compiled'], function() {
+		winston.info('NodeBB Ready');
+		emitter.emit('nodebb:ready');
+	});
 
 	module.exports.listen = function(callback) {
 		var	bind_address = ((nconf.get('bind_address') === "0.0.0.0" || !nconf.get('bind_address')) ? '0.0.0.0' : nconf.get('bind_address')) + ':' + port;
 		winston.info('NodeBB attempting to listen on: ' + bind_address);
 
-		server.listen(port, nconf.get('bind_address'), function() {
+		server.listen(port, nconf.get('bind_address'), function(err) {
+			if (err) {
+				return callback(err);
+			}
+
 			winston.info('NodeBB is now listening on: ' + bind_address);
 			if (process.send) {
 				process.send({
@@ -144,9 +140,7 @@ if(nconf.get('ssl')) {
 				});
 			}
 
-			if (typeof callback === 'function') {
-				callback();
-			}
+			callback();
 		});
 	};
 

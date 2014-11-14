@@ -179,6 +179,7 @@ Controllers.register = function(req, res, next) {
 	data.minimumPasswordLength = meta.config.minimumPasswordLength;
 	data.termsOfUse = meta.config.termsOfUse;
 	data.regFormEntry = [];
+	data.error = req.flash('error')[0];
 
 	plugins.fireHook('filter:register.build', {req: req, res: res, templateData: data}, function(err, data) {
 		if (err && process.env === 'development') {
@@ -235,6 +236,13 @@ Controllers.outgoing = function(req, res, next) {
 		res.status(404);
 		res.redirect(nconf.get('relative_path') + '/404');
 	}
+};
+
+Controllers.termsOfUse = function(req, res, next) {
+	if (!meta.config.termsOfUse) {
+		return categoriesController.notFound(req, res);
+	}
+	res.render('tos', {termsOfUse: meta.config.termsOfUse});
 };
 
 module.exports = Controllers;
