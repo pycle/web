@@ -10,7 +10,7 @@ module.exports = function(Categories) {
 	Categories.getCategoryTopics = function(data, callback) {
 		var tids;
 		async.waterfall([
-			async.apply(plugins.fireHook, 'filter:category.topics.get', data),
+			async.apply(plugins.fireHook, 'filter:category.topics.prepare', data),
 			function(data, next) {
 				Categories.getTopicIds(data.targetUid ? 'cid:' + data.cid + ':uid:' + data.targetUid + ':tids' : 'cid:' + data.cid + ':tids', data.start, data.stop, next);
 			},
@@ -36,9 +36,11 @@ module.exports = function(Categories) {
 					topics[i].index = indices[topics[i].tid];
 				}
 
-				next(null, {
-					topics: topics,
-					nextStart: data.stop + 1
+				plugins.fireHook('filter:category.topics.get', topics, function(err, topics) {
+					next(null, {
+						topics: topics,
+						nextStart: data.stop + 1
+					});
 				});
 			}
 		], callback);
