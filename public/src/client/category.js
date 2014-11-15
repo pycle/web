@@ -311,13 +311,14 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 
 		loadTopicsAfter(after, direction, function() {
 			// I'm not sure what this does, ask baris - andrew
+			// seems like direction isn't even being used in loadTopicsAfter, so I guess this is where it was being used?
 			/*if (direction < 0 && el) {
 				Category.scrollToTopic(el.attr('data-tid'), null, 0, offset);
 			}*/
 		});
 	};
 
-	function loadTopicsAfter(after, callback) {
+	function loadTopicsAfter(after, direction, callback) {
 		if(!utils.isNumber(after) || (after === 0 && $('#topics-container li.category-item[data-index="0"]').length)) {
 			return;
 		}
