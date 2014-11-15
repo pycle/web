@@ -17,6 +17,10 @@ define('taskbar', function() {
 					module = $btn.attr('data-module'),
 					uuid = $btn.attr('data-uuid');
 
+				if (!module) {
+					return;
+				}
+
 				require([module], function(module) {
 					if (!$btn.hasClass('active')) {
 						minimizeAll();
