@@ -8,25 +8,26 @@ var async = require('async'),
 	db = require('../database'),
 	posts = require('../posts'),
 	topics = require('../topics'),
-	privileges = require('../privileges');
+	privileges = require('../privileges'),
+	plugins = require('../plugins');
 
 module.exports = function(Categories) {
 	Categories.getRecentReplies = function(cid, uid, count, callback) {
 		if(!parseInt(count, 10)) {
 			return callback(null, []);
 		}
-		privileges.categories.can('read', cid, uid, function(err, canRead) {
-			if (err || !canRead) {
+
+		db.getSortedSetRevRange('cid:' + cid + ':pids', 0, count - 1, function(err, pids) {
+			if (err || !Array.isArray(pids) || !pids.length) {
 				return callback(err, []);
 			}
 
-			db.getSortedSetRevRange('cid:' + cid + ':pids', 0, count - 1, function(err, pids) {
-				if (err || !Array.isArray(pids) || !pids.length) {
-					return callback(err, []);
+			async.waterfall([
+				async.apply(privileges.posts.filter, 'read', pids, uid),
+				function(pids, next) {
+					posts.getPostSummaryByPids(pids, uid, {stripTags: true}, next);
 				}
-
-				posts.getPostSummaryByPids(pids, uid, {stripTags: true}, callback);
-			});
+			], callback);
 		});
 	};
 
@@ -134,11 +135,8 @@ module.exports = function(Categories) {
 					done = true;
 					return next();
 				}
-				var keys = movePids.map(function(pid) {
-					return 'post:' + pid;
-				});
 
-				db.getObjectsFields(keys, ['timestamp'], function(err, postData) {
+				posts.getPostsFields(movePids, ['timestamp'], function(err, postData) {
 					if (err) {
 						return next(err);
 					}

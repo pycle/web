@@ -68,11 +68,7 @@ module.exports = function(privileges) {
 			return callback(null, []);
 		}
 
-		var keys = tids.map(function(tid) {
-			return 'topic:' + tid;
-		});
-
-		db.getObjectsFields(keys, ['tid', 'cid'], function(err, topics) {
+		topics.getTopicsFields(tids, ['tid', 'cid'], function(err, topics) {
 			if (err) {
 				return callback(err);
 			}
@@ -91,7 +87,14 @@ module.exports = function(privileges) {
 				}).map(function(topic) {
 					return topic.tid;
 				});
-				callback(null, tids);
+
+				plugins.fireHook('filter:privileges.topics.filter', {
+					privilege: privilege,
+					uid: uid,
+					tids: tids
+				}, function(err, data) {
+					callback(err, data ? data.tids : null);
+				});
 			});
 		});
 	};

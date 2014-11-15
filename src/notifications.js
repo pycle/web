@@ -219,7 +219,7 @@ var async = require('async'),
 
 	Notifications.markRead = function(nid, uid, callback) {
 		callback = callback || function() {};
-		if (!parseInt(uid, 10) || !parseInt(nid, 10)) {
+		if (!parseInt(uid, 10) || !nid) {
 			return callback();
 		}
 		Notifications.markReadMultiple([nid], uid, callback);
@@ -241,7 +241,7 @@ var async = require('async'),
 			}
 
 			var datetimes = notificationData.map(function(notification) {
-				return notification && notification.datetime;
+				return (notification && notification.datetime) || Date.now();
 			});
 
 			async.parallel([

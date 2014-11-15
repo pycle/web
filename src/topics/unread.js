@@ -105,7 +105,7 @@ module.exports = function(Topics) {
 					tids = tids.slice(start, stop + 1);
 				}
 
-				callback(err, tids);
+				callback(null, tids);
 			});
 		});
 	};
@@ -115,39 +115,22 @@ module.exports = function(Topics) {
 			return callback(null, tids);
 		}
 
-		var keys = tids.map(function(tid) {
-			return 'topic:' + tid;
-		});
-
-		db.getObjectsFields(keys, ['tid', 'cid'], function(err, topics) {
-			if (err) {
-				return callback(err);
-			}
-
-			var topicCids = topics.filter(function(topic) {
-				return topic && topic.cid;
-			}).map(function(topic) {
-				return topic.cid.toString();
-			});
-
-			topicCids = topicCids.filter(function(cid) {
-				return ignoredCids.indexOf(cid) === -1;
-			});
-
-			privileges.categories.filterCids('read', topicCids, uid, function(err, readableCids) {
-				if (err) {
-					return callback(err);
-				}
-
-				topics = topics.filter(function(topic) {
-					return topic.cid && readableCids.indexOf(topic.cid.toString()) !== -1;
+		async.waterfall([
+			function(next) {
+				privileges.topics.filter('read', tids, uid, next);
+			},
+			function(tids, next) {
+				Topics.getTopicsFields(tids, ['tid', 'cid'], next);
+			},
+			function(topics, next) {
+				tids = topics.filter(function(topic) {
+					return topic && topic.cid && ignoredCids.indexOf(topic.cid.toString()) === -1;
 				}).map(function(topic) {
 					return topic.tid;
 				});
-
-				callback(null, topics);
-			});
-		});
+				next(null, tids);
+			}
+		], callback);
 	}
 
 	Topics.pushUnreadCount = function(uid, callback) {
