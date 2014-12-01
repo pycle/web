@@ -49,7 +49,7 @@ adminController.home = function(req, res, next) {
 		},
 		notices: function(next) {
 			var notices = [
-				{done: !meta.restartRequired, doneText: 'Restart not required', notDoneText:'Restart required'},
+				{done: !meta.reloadRequired, doneText: 'Reload not required', notDoneText:'Reload required'},
 				{done: plugins.hasListeners('action:email.send'), doneText: 'Emailer Installed', notDoneText:'Emailer not installed'},
 				{done: plugins.hasListeners('filter:search.query'), doneText: 'Search Plugin Installed', notDoneText:'Search Plugin not installed'}
 			];
@@ -141,8 +141,7 @@ function filterAndRenderCategories(req, res, next, active) {
 		});
 
 		res.render('admin/manage/categories', {
-			categories: categoryData,
-			csrf: req.csrfToken()
+			categories: categoryData
 		});
 	});
 }
@@ -188,14 +187,9 @@ adminController.events.get = function(req, res, next) {
 };
 
 adminController.logs.get = function(req, res, next) {
-	var logPath = path.join('logs', path.sep, 'output.log');
-	fs.readFile(logPath, function(err, data) {
-		if (err || !data) {
-			data = '';
-		}
-
+	meta.logs.get(function(err, logs) {
 		res.render('admin/advanced/logs', {
-			data: validator.escape(data.toString())
+			data: validator.escape(logs)
 		});
 	});
 };
@@ -223,9 +217,7 @@ adminController.languages.get = function(req, res, next) {
 adminController.settings.get = function(req, res, next) {
 	var term = req.params.term ? req.params.term : 'general';
 
-	res.render('admin/settings/' + term, {
-		'csrf': req.csrfToken()
-	});
+	res.render('admin/settings/' + term);
 };
 
 adminController.logger.get = function(req, res, next) {

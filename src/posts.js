@@ -8,6 +8,7 @@ var async = require('async'),
 	user = require('./user'),
 	topics = require('./topics'),
 	postTools = require('./postTools'),
+	privileges = require('./privileges'),
 	plugins = require('./plugins');
 
 (function(Posts) {
@@ -85,6 +86,23 @@ var async = require('async'),
 		});
 	};
 
+	Posts.getPostsFromSet = function(set, uid, start, end, callback) {
+		async.waterfall([
+			function(next) {
+				db.getSortedSetRevRange(set, start, end, next);
+			},
+			function(pids, next) {
+				privileges.posts.filter('read', pids, uid, next);
+			},
+			function(pids, next) {
+				Posts.getPostSummaryByPids(pids, uid, {stripTags: false}, next);
+			},
+			function(posts, next) {
+				next(null, {posts: posts, nextStart: end + 1});
+			}
+		], callback);
+	};
+
 	Posts.getPostData = function(pid, callback) {
 		db.getObject('post:' + pid, function(err, data) {
 			if(err) {
@@ -133,7 +151,7 @@ var async = require('async'),
 				return callback(err);
 			}
 			plugins.fireHook('filter:post.getFields', {posts: posts, fields: fields}, function(err, data) {
-				 callback(err, (data && Array.isArray(data.posts)) ? data.posts : null);
+				callback(err, (data && Array.isArray(data.posts)) ? data.posts : null);
 			});
 		});
 	};

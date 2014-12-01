@@ -131,10 +131,6 @@ var async = require('async'),
 			if (err) {
 				return callback(err);
 			}
-			plugins.fireHook('action:post.upvote', {
-				pid: pid,
-				uid: uid
-			});
 
 			callback(null, votes);
 		});
@@ -162,17 +158,14 @@ var async = require('async'),
 				if (err) {
 					return callback(err);
 				}
-				plugins.fireHook('action:post.downvote', {
-					pid: pid,
-					uid: uid
-				});
+
 				callback(null, votes);
 			});
 		});
 	};
 
 	function toggleVote(type, pid, uid, callback) {
-		Favourites.unvote(pid, uid, function(err) {
+		unvote(pid, uid, type, function(err) {
 			if (err) {
 				return callback(err);
 			}
@@ -182,10 +175,32 @@ var async = require('async'),
 	}
 
 	Favourites.unvote = function(pid, uid, callback) {
+		unvote(pid, uid, 'unvote', callback);
+	};
+
+	function unvote(pid, uid, command, callback) {
 		Favourites.hasVoted(pid, uid, function(err, voteStatus) {
 			if (err) {
 				return callback(err);
 			}
+
+			var hook,
+				current = voteStatus.upvoted ? 'upvote' : 'downvote';
+
+			if (voteStatus.upvoted && command === 'downvote' || voteStatus.downvoted && command === 'upvote') {
+				hook = command;
+			} else if (voteStatus.upvoted || voteStatus.downvoted) {
+				hook = 'unvote';
+			} else {
+				hook = command;
+				current = 'unvote';
+			}
+
+			plugins.fireHook('action:post.' + hook, {
+				pid: pid,
+				uid: uid,
+				current: current
+			});
 
 			if (!voteStatus || (!voteStatus.upvoted && !voteStatus.downvoted)) {
 				return callback();
@@ -193,12 +208,13 @@ var async = require('async'),
 
 			vote(voteStatus.upvoted ? 'downvote' : 'upvote', true, pid, uid, callback);
 		});
-	};
+	}
 
 	Favourites.hasVoted = function(pid, uid, callback) {
 		if (!parseInt(uid, 10)) {
 			return callback(null, {upvoted: false, downvoted: false});
 		}
+
 		db.isMemberOfSets(['pid:' + pid + ':upvote', 'pid:' + pid + ':downvote'], uid, function(err, hasVoted) {
 			if (err) {
 				return callback(err);

@@ -27,8 +27,7 @@ middleware.isAdmin = function(req, res, next) {
 		}
 
 		if (!isAdmin) {
-			res.status(403);
-			res.redirect('/403');
+			res.status(403).redirect(nconf.get('relative_path') + '/403');
 		} else {
 			next();
 		}
@@ -71,7 +70,6 @@ middleware.buildHeader = function(req, res, next) {
 						return next(err);
 					}
 					var data = {
-						csrf: req.csrfToken ? req.csrfToken() : undefined,
 						relative_path: nconf.get('relative_path'),
 						plugins: pluginData.custom_header.plugins,
 						authentication: pluginData.custom_header.authentication,

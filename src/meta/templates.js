@@ -21,18 +21,29 @@ Templates.compile = function(callback) {
 		if (callback) {
 			callback();
 		}
+		return;
 	}
 
 	var coreTemplatesPath = nconf.get('core_templates_path'),
 		baseTemplatesPath = nconf.get('base_templates_path'),
 		viewsPath = nconf.get('views_dir'),
-		themeTemplatesPath = nconf.get('theme_templates_path');
+		themeTemplatesPath = nconf.get('theme_templates_path'),
+		themeConfig = require(nconf.get('theme_config'));
+
+	if (themeConfig.baseTheme) {
+		var pathToBaseTheme = path.join(nconf.get('themes_path'), themeConfig.baseTheme),
+			baseTemplatesPath = require(path.join(pathToBaseTheme, 'theme.json')).templates;
+
+		if (!baseTemplatesPath){
+			baseTemplatesPath = path.join(pathToBaseTheme, 'templates');
+		}
+	}
 
 	plugins.getTemplates(function(err, pluginTemplates) {
 		if (err) {
 			return callback(err);
 		}
-		winston.info('[meta/templates] Compiling templates');
+		winston.verbose('[meta/templates] Compiling templates');
 		rimraf.sync(viewsPath);
 		mkdirp.sync(viewsPath);
 
@@ -105,7 +116,7 @@ Templates.compile = function(callback) {
 					winston.error('[meta/templates] ' + err.stack);
 				} else {
 					compileIndex(viewsPath, function() {
-						winston.info('[meta/templates] Successfully compiled templates.');
+						winston.verbose('[meta/templates] Successfully compiled templates.');
 						emitter.emit('templates:compiled');
 						if (callback) {
 							callback();

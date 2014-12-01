@@ -1,0 +1,23 @@
+{
+    "password-reset-requested": "Password Reset Requested - %1!",
+    "welcome-to": "Welcome to %1",
+    "greeting_no_name": "Hello",
+    "greeting_with_name": "Hello %1",
+    "welcome.text1": "%1 এ নিবন্ধন করার জন্য আপনাকে ধন্যবাদ!",
+    "welcome.text2": "আপনার একাউন্ট এ্যাক্টিভেট করার জন্য, আপনি যে ইমেইল এড্রেস ব্যাবহার করে নিবন্ধন করেছেন তা যাচাই করতে হবে",
+    "welcome.cta": "আপনার ইমেইল এড্রেস নিশ্চিত করার জন্য এখানে ক্লিক করুন",
+    "reset.text1": "আমরা আপনার পাসওয়ার্ড রিসেট করার অনুরোধ পেয়েছি, সম্ভবত আপনি আপনার পাসওয়ার্ড ভুলে গিয়েছেন বলেই। তবে যদি তা না হয়ে থাকে, তাহলে এই মেইলকে উপেক্ষা করতে পারেন।",
+    "reset.text2": "পাসওয়ার্ড রিসেট করতে নিচের লিংকে ক্লিক করুন",
+    "reset.cta": "পাসওয়ার্ড রিসেট করতে এখানে ক্লিক করুন",
+    "digest.notifications": "You have unread notifications from %1:",
+    "digest.latest_topics": "Latest topics from %1",
+    "digest.cta": "Click here to visit %1",
+    "digest.unsub.info": "This digest was sent to you due to your subscription settings.",
+    "digest.no_topics": "There have been no active topics in the past %1",
+    "notif.chat.subject": "New chat message received from %1",
+    "notif.chat.cta": "Click here to continue the conversation",
+    "notif.chat.unsub.info": "This chat notification was sent to you due to your subscription settings.",
+    "test.text1": "This is a test email to verify that the emailer is set up correctly for your NodeBB.",
+    "unsub.cta": "Click here to alter those settings",
+    "closing": "Thanks!"
+}

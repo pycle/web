@@ -13,22 +13,21 @@ var async = require('async'),
 
 module.exports = function(Categories) {
 	Categories.getRecentReplies = function(cid, uid, count, callback) {
-		if(!parseInt(count, 10)) {
+		if (!parseInt(count, 10)) {
 			return callback(null, []);
 		}
 
-		db.getSortedSetRevRange('cid:' + cid + ':pids', 0, count - 1, function(err, pids) {
-			if (err || !Array.isArray(pids) || !pids.length) {
-				return callback(err, []);
+		async.waterfall([
+			function(next) {
+				db.getSortedSetRevRange('cid:' + cid + ':pids', 0, count - 1, next);
+			},
+			function(pids, next) {
+				privileges.posts.filter('read', pids, uid, next);
+			},
+			function(pids, next) {
+				posts.getPostSummaryByPids(pids, uid, {stripTags: true}, next);
 			}
-
-			async.waterfall([
-				async.apply(privileges.posts.filter, 'read', pids, uid),
-				function(pids, next) {
-					posts.getPostSummaryByPids(pids, uid, {stripTags: true}, next);
-				}
-			], callback);
-		});
+		], callback);
 	};
 
 	Categories.getRecentTopicReplies = function(categoryData, uid, callback) {

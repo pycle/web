@@ -4,15 +4,15 @@ var pkg = require('./../../package.json'),
 	meta = require('./../meta'),
 	user = require('./../user'),
 	plugins = require('./../plugins'),
-	widgets = require('../widgets');
+	widgets = require('../widgets'),
+
+	nconf = require('nconf');
 
 var apiController = {};
 
 apiController.getConfig = function(req, res, next) {
-	var serverConfig = require('./../../config.json');
-
 	var config = {};
-	config.relative_path = serverConfig.relative_path;
+	config.relative_path = nconf.get('relative_path');
 	config.version = pkg.version;
 	config.siteTitle = meta.config.title || meta.config.browserTitle || 'NodeBB';
 	config.showSiteTitle = parseInt(meta.config.showSiteTitle, 10) === 1;
@@ -52,6 +52,8 @@ apiController.getConfig = function(req, res, next) {
 	config['css-buster'] = meta.css.hash;
 	config.requireEmailConfirmation = parseInt(meta.config.requireEmailConfirmation, 10) === 1;
 	config.topicPostSort = meta.config.topicPostSort || 'oldest_to_newest';
+	config.csrf_token = req.csrfToken();
+	config.searchEnabled = plugins.hasListeners('filter:search.query');
 
 	if (!req.user) {
 		if (res.locals.isAPI) {
@@ -74,6 +76,7 @@ apiController.getConfig = function(req, res, next) {
 		config.userLang = settings.language || config.defaultLang;
 		config.openOutgoingLinksInNewTab = settings.openOutgoingLinksInNewTab;
 		config.topicPostSort = settings.topicPostSort || config.topicPostSort;
+		config.topicSearchEnabled = settings.topicSearchEnabled || false;
 
 		if (res.locals.isAPI) {
 			res.status(200).json(config);

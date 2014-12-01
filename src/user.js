@@ -15,6 +15,7 @@ var	async = require('async'),
 	User.email = require('./user/email');
 	User.notifications = require('./user/notifications');
 	User.reset = require('./user/reset');
+	User.digest = require('./user/digest');
 
 	require('./user/auth')(User);
 	require('./user/create')(User);
@@ -56,7 +57,9 @@ var	async = require('async'),
 			return 'user:' + uid;
 		});
 
-		addField('uid');
+		if (fields.indexOf('uid') === -1) {
+			fields.push('uid');
+		}
 
 		if (fields.indexOf('picture') !== -1) {
 			addField('email');
@@ -134,11 +137,23 @@ var	async = require('async'),
 	User.updateLastOnlineTime = function(uid, callback) {
 		callback = callback || function() {};
 		User.getUserFields(uid, ['status', 'lastonline'], function(err, userData) {
-			if(err || userData.status === 'offline' || Date.now() - parseInt(userData.lastonline, 10) < 300000) {
+			var now = Date.now();
+			if (err || userData.status === 'offline' || now - parseInt(userData.lastonline, 10) < 300000) {
 				return callback(err);
 			}
 
-			User.setUserField(uid, 'lastonline', Date.now(), callback);
+			User.setUserField(uid, 'lastonline', now, callback);
+		});
+	};
+
+	User.updateOnlineUsers = function(uid, callback) {
+		callback = callback || function() {};
+		db.sortedSetScore('users:online', uid, function(err, score) {
+			var now = Date.now();
+			if (err || now - parseInt(score, 10) < 300000) {
+				return callback(err);
+			}
+			db.sortedSetAdd('users:online', now, uid, callback);
 		});
 	};
 
@@ -175,21 +190,26 @@ var	async = require('async'),
 			if (err) {
 				return callback(err);
 			}
-			plugins.fireHook('action:user.set', {field: field, value: value,  type: 'decrement'});
+			plugins.fireHook('action:user.set', {field: field, value: value, type: 'decrement'});
 
 			callback(null, value);
 		});
 	};
 
+	User.getUidsFromSet = function(set, start, stop, callback) {
+		if (set === 'users:online') {
+			var count = parseInt(stop, 10) === -1 ? stop : stop - start + 1;
+			var now = Date.now();
+			db.getSortedSetRevRangeByScore(set, start, count, now, now - 300000, callback);
+		} else {
+			db.getSortedSetRevRange(set, start, stop, callback);
+		}
+	};
+
 	User.getUsersFromSet = function(set, start, stop, callback) {
 		async.waterfall([
 			function(next) {
-				if (set === 'users:online') {
-					var uids = require('./socket.io').getConnectedClients();
-					next(null, uids.slice(start, stop + 1));
-				} else {
-					db.getSortedSetRevRange(set, start, stop, next);
-				}
+				User.getUidsFromSet(set, start, stop, next);
 			},
 			function(uids, next) {
 				User.getUsers(uids, next);
@@ -252,7 +272,7 @@ var	async = require('async'),
 			return callback(null, password);
 		}
 
-		Password.hash(nconf.get('bcrypt_rounds'), password, callback);
+		Password.hash(nconf.get('bcrypt_rounds') || 12, password, callback);
 	};
 
 	User.addTopicIdToUser = function(uid, tid, timestamp, callback) {
@@ -262,12 +282,6 @@ var	async = require('async'),
 	User.exists = function(userslug, callback) {
 		User.getUidByUserslug(userslug, function(err, exists) {
 			callback(err, !! exists);
-		});
-	};
-
-	User.count = function(callback) {
-		db.getObjectField('global', 'userCount', function(err, count) {
-			callback(err, count ? count : 0);
 		});
 	};
 

@@ -12,23 +12,14 @@ var async = require('async'),
 
 module.exports = function(Topics) {
 
-	Topics.getTeasers = function(tids, uid, callback) {
+	Topics.getTeasers = function(tids, callback) {
 		if (!Array.isArray(tids) || !tids.length) {
 			return callback(null, []);
 		}
 
 		async.parallel({
-			counts: function(next) {
-				Topics.getTopicsFields(tids, ['postcount'], function(err, topics) {
-					if (err) {
-						return next(err);
-					}
-					topics = topics.map(function(topic) {
-						return topic && (parseInt(topic.postcount, 10) || 0);
-					});
-
-					next(null, topics);
-				});
+			topics: function(next) {
+				Topics.getTopicsFields(tids, ['postcount'], next);
 			},
 			pids: function(next) {
 				async.map(tids, function(tid, next) {
@@ -41,6 +32,10 @@ module.exports = function(Topics) {
 			if (err) {
 				return callback(err);
 			}
+
+			var counts = results.topics.map(function(topic) {
+				return topic && (parseInt(topic.postcount, 10) || 0);
+			});
 
 			results.pids = results.pids.filter(Boolean);
 
@@ -74,7 +69,7 @@ module.exports = function(Topics) {
 
 					var teasers = tids.map(function(tid, index) {
 						if (tidToPost[tid]) {
-							tidToPost[tid].index = results.counts[index];
+							tidToPost[tid].index = counts[index];
 						}
 						return tidToPost[tid];
 					});
@@ -85,7 +80,7 @@ module.exports = function(Topics) {
 		});
 	};
 
-	Topics.getTeaser = function(tid, uid, callback) {
+	Topics.getTeaser = function(tid, callback) {
 		Topics.getLatestUndeletedPid(tid, function(err, pid) {
 			if (err || !pid) {
 				return callback(err);
@@ -109,8 +104,8 @@ module.exports = function(Topics) {
 						});
 					});
 				},
-				postIndex: function(next) {
-					posts.getPidIndex(pid, uid, next);
+				postCount: function(next) {
+					Topics.getTopicField(tid, 'post_count', next);
 				}
 			}, function(err, results) {
 				if (err) {
@@ -118,7 +113,7 @@ module.exports = function(Topics) {
 				}
 
 				results.postData.timestamp = utils.toISOString(results.postData.timestamp);
-				results.postData.index = results.postIndex;
+				results.postData.index = results.postCount;
 
 				callback(null, results.postData);
 			});

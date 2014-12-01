@@ -41,26 +41,28 @@ SocketTopics.post = function(socket, data, callback) {
 		socket.emit('event:new_post', {posts: [result.postData]});
 		socket.emit('event:new_topic', result.topicData);
 
-		var uids = websockets.getConnectedClients();
-
-		privileges.categories.filterUids('read', result.topicData.cid, uids, function(err, uids) {
+		user.getUidsFromSet('users:online', 0, -1, function(err, uids) {
 			if (err) {
 				return;
 			}
 
-			plugins.fireHook('filter:sockets.sendNewPostToUids', {uidsTo: uids, uidFrom: data.uid, type: "newTopic"}, function(err, data) {
-				uids = data.uidsTo;
-
-				for(var i=0; i<uids.length; ++i) {
-					if (parseInt(uids[i], 10) !== socket.uid) {
-						websockets.in('uid_' + uids[i]).emit('event:new_post', {posts: [result.postData]});
-						websockets.in('uid_' + uids[i]).emit('event:new_topic', result.topicData);
-					}
+			privileges.categories.filterUids('read', result.topicData.cid, uids, function(err, uids) {
+				if (err) {
+					return;
 				}
+
+				plugins.fireHook('filter:sockets.sendNewPostToUids', {uidsTo: uids, uidFrom: data.uid, type: "newTopic"}, function(err, data) {
+					uids = data.uidsTo;
+
+					for(var i=0; i<uids.length; ++i) {
+						if (parseInt(uids[i], 10) !== socket.uid) {
+							websockets.in('uid_' + uids[i]).emit('event:new_post', {posts: [result.postData]});
+							websockets.in('uid_' + uids[i]).emit('event:new_topic', result.topicData);
+						}
+					}
+				});
 			});
 		});
-
-		websockets.emitTopicPostStats();
 	});
 };
 
@@ -210,7 +212,7 @@ SocketTopics.purge = function(socket, data, callback) {
 		if (err) {
 			return callback(err);
 		}
-		websockets.emitTopicPostStats();
+
 		websockets.in('category_' + data.cid).emit('event:topic_purged', data.tids);
 		async.each(data.tids, function(tid, next) {
 			websockets.in('topic_' + tid).emit('event:topic_purged', tid);
@@ -326,11 +328,11 @@ SocketTopics.move = function(socket, data, callback) {
 				return next(err);
 			}
 
-			websockets.server.sockets.in('topic_' + tid).emit('event:topic_moved', {
+			websockets.in('topic_' + tid).emit('event:topic_moved', {
 				tid: tid
 			});
 
-			websockets.server.sockets.in('category_' + oldCid).emit('event:topic_moved', {
+			websockets.in('category_' + oldCid).emit('event:topic_moved', {
 				tid: tid
 			});
 
@@ -455,17 +457,6 @@ SocketTopics.loadMore = function(socket, data, callback) {
 	});
 };
 
-SocketTopics.loadMoreRecentTopics = function(socket, data, callback) {
-	if(!data || !data.after) {
-		return callback(new Error('[[error:invalid-data]]'));
-	}
-
-	var start = parseInt(data.after, 10),
-		end = start + 9;
-
-	topics.getRecentTopics(socket.uid, start, end, callback);
-};
-
 SocketTopics.loadMoreUnreadTopics = function(socket, data, callback) {
 	if(!data || !data.after) {
 		return callback(new Error('[[error:invalid-data]]'));
@@ -485,7 +476,7 @@ SocketTopics.loadMoreFromSet = function(socket, data, callback) {
 	var start = parseInt(data.after, 10),
 		end = start + 9;
 
-	topics.getTopicsFromSet(socket.uid, data.set, start, end, callback);
+	topics.getTopicsFromSet(data.set, socket.uid, start, end, callback);
 };
 
 SocketTopics.loadTopics = function(socket, data, callback) {
@@ -493,7 +484,7 @@ SocketTopics.loadTopics = function(socket, data, callback) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
-	topics.getTopicsFromSet(socket.uid, data.set, data.start, data.end, callback);
+	topics.getTopicsFromSet(data.set, socket.uid, data.start, data.end, callback);
 };
 
 SocketTopics.getPageCount = function(socket, tid, callback) {

@@ -31,10 +31,6 @@ SocketUser.deleteAccount = function(socket, data, callback) {
 	}
 };
 
-SocketUser.count = function(socket, data, callback) {
-	user.count(callback);
-};
-
 SocketUser.emailExists = function(socket, data, callback) {
 	if(data && data.email) {
 		user.email.exists(data.email, callback);
@@ -70,7 +66,7 @@ SocketUser.search = function(socket, username, callback) {
 	if (!socket.uid) {
 		return callback(new Error('[[error:not-logged-in]]'));
 	}
-	user.search(username, callback);
+	user.search(username, 'username', callback);
 };
 
 // Password Reset
@@ -199,13 +195,13 @@ SocketUser.uploadProfileImageFromUrl = function(socket, url, callback) {
 		return;
 	}
 
-	plugins.fireHook('filter:uploadImage', {image: {url: url}, uid: socket.uid}, function(err, image) {
+	plugins.fireHook('filter:uploadImage', {image: {url: url}, uid: socket.uid}, function(err, data) {
 		if (err) {
 			return callback(err);
 		}
 
-		user.setUserFields(socket.uid, {uploadedpicture: image.url, picture: image.url}, function(err) {
-			callback(err, image.url);
+		user.setUserFields(socket.uid, {uploadedpicture: data.url, picture: data.url}, function(err) {
+			callback(err, data.url);
 		});
 	});
 };
@@ -326,10 +322,6 @@ SocketUser.getUnreadChatCount = function(socket, data, callback) {
 	messaging.getUnreadCount(socket.uid, callback);
 };
 
-SocketUser.getActiveUsers = function(socket, data, callback) {
-	module.parent.exports.emitOnlineUserCount(callback);
-};
-
 SocketUser.loadMore = function(socket, data, callback) {
 	if(!data || !data.set || parseInt(data.after, 10) < 0) {
 		return callback(new Error('[[error:invalid-data]]'));
@@ -363,17 +355,6 @@ SocketUser.loadMore = function(socket, data, callback) {
 			});
 		});
 	});
-};
-
-SocketUser.loadMoreRecentPosts = function(socket, data, callback) {
-	if(!data || !data.uid || !utils.isNumber(data.after)) {
-		return callback(new Error('[[error:invalid-data]]'));
-	}
-
-	var start = Math.max(0, parseInt(data.after, 10)),
-		end = start + 9;
-
-	posts.getPostsByUid(socket.uid, data.uid, start, end, callback);
 };
 
 SocketUser.setStatus = function(socket, status, callback) {

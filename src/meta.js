@@ -11,7 +11,7 @@ var async = require('async'),
 	auth = require('./routes/authentication');
 
 (function (Meta) {
-	Meta.restartRequired = false;
+	Meta.reloadRequired = false;
 
 	require('./meta/configs')(Meta);
 	require('./meta/themes')(Meta);
@@ -20,6 +20,7 @@ var async = require('async'),
 	require('./meta/css')(Meta);
 	require('./meta/sounds')(Meta);
 	require('./meta/settings')(Meta);
+	require('./meta/logs')(Meta);
 	Meta.templates = require('./meta/templates');
 
 	/* Assorted */

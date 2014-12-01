@@ -11,6 +11,7 @@ tagsController.getTag = function(req, res, next) {
 	var tag = validator.escape(req.params.tag);
 	var uid = req.user ? req.user.uid : 0;
 	var end = (parseInt(meta.config.topicsPerList, 10) || 20) - 1;
+
 	topics.getTagTids(tag, 0, end, function(err, tids) {
 		if (err) {
 			return next(err);
@@ -18,17 +19,17 @@ tagsController.getTag = function(req, res, next) {
 
 		if (Array.isArray(tids) && !tids.length) {
 			topics.deleteTag(tag);
-			return res.render('tag', {topics: [], tag:tag});
+			return res.render('tag', {topics: [], tag: tag});
 		}
 
-		topics.getTopics('tag:' + tag + ':topics', uid, tids, function(err, data) {
+		topics.getTopics(tids, uid, function(err, topics) {
 			if (err) {
 				return next(err);
 			}
 
 			res.locals.metaTags = [
 				{
-					name: "title",
+					name: 'title',
 					content: tag
 				},
 				{
@@ -36,14 +37,12 @@ tagsController.getTag = function(req, res, next) {
 					content: tag
 				},
 				{
-					property: "og:url",
+					property: 'og:url',
 					content: nconf.get('url') + '/tags/' + tag
 				}
 			];
 
-			data.tag = tag;
-			data.nextStart = end + 1;
-			res.render('tag', data);
+			res.render('tag', {topics: topics, tag: tag, nextStart: end + 1});
 		});
 	});
 };

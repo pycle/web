@@ -8,8 +8,7 @@ var async = require('async'),
 	meta = require('../meta'),
 	websockets = require('../socket.io'),
 	postTools = require('../postTools'),
-	plugins = require('../plugins'),
-	privileges = require('../privileges');
+	plugins = require('../plugins');
 
 
 module.exports = function(Posts) {
@@ -62,6 +61,7 @@ module.exports = function(Posts) {
 					}
 
 					userData.custom_profile_info = results.customProfileInfo.profile;
+					userData.signature = sanitizeSignature(userData.signature);
 
 					plugins.fireHook('filter:posts.modifyUserInfo', userData, next);
 				});
@@ -105,36 +105,19 @@ module.exports = function(Posts) {
 			user.isModerator(uid, cids, callback);
 		});
 	};
-
-	Posts.getPostsByUid = function(callerUid, uid, start, end, callback) {
-		async.waterfall([
-			function(next) {
-				user.getPostIds(uid, start, end, next);
-			},
-			function(pids, next) {
-				privileges.posts.filter('read', pids, callerUid, next);
-			},
-			function(pids, next) {
-				Posts.getPostSummaryByPids(pids, callerUid, {stripTags: false}, next);
-			},
-			function(posts, next) {
-				next(null, {posts: posts, nextStart: end + 1});
-			}
-		], callback);
-	};
-
-	Posts.getFavourites = function(uid, start, end, callback) {
-		async.waterfall([
-			function(next) {
-				db.getSortedSetRevRange('uid:' + uid + ':favourites', start, end, next);
-			},
-			function(pids, next) {
-				Posts.getPostSummaryByPids(pids, uid, {stripTags: false}, next);
-			},
-			function(posts, next) {
-				callback(null, {posts: posts, nextStart: end + 1});
-			}
-		], callback);
-	};
-
 };
+
+function sanitizeSignature(signature) {
+	var	string = require('string')(signature),
+		tagsToStrip = [];
+
+	if (parseInt(meta.config['signatures:disableLinks'], 10) === 1) {
+		tagsToStrip.push('a');
+	}
+
+	if (parseInt(meta.config['signatures:disableImages'], 10) === 1) {
+		tagsToStrip.push('img');
+	}
+
+	return tagsToStrip.length ? string.stripTags.apply(string, tagsToStrip).s : signature;
+}

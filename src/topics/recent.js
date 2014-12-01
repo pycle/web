@@ -15,36 +15,18 @@ module.exports = function(Topics) {
 		year: 31104000000
 	};
 
-	Topics.getRecentTopics = function(uid, start, end, callback) {
+	Topics.getLatestTopics = function(uid, start, end, term, callback) {
 		async.waterfall([
-			function(next) {
-				db.getSortedSetRevRange('topics:recent', start, end, next);
+			function (next) {
+				Topics.getLatestTids(start, end, term, next);
 			},
 			function(tids, next) {
-				Topics.getTopics('topics:recent', uid, tids, next);
+				Topics.getTopics(tids, uid, next);
 			},
-			function(data, next) {
-				data.nextStart = end + 1;
-				next(null, data);
+			function(topics, next) {
+				next(null, {topics: topics, nextStart: end + 1});
 			}
 		], callback);
-	};
-
-	Topics.getLatestTopics = function(uid, start, end, term, callback) {
-		Topics.getLatestTids(start, end, term, function(err, tids) {
-			if (err) {
-				return callback(err);
-			}
-
-			Topics.getTopics('topics:recent', uid, tids, function(err, data) {
-				if (err) {
-					return callback(err);
-				}
-
-				data.nextStart = end + 1;
-				callback(null, data);
-			});
-		});
 	};
 
 	Topics.getLatestTids = function(start, end, term, callback) {
@@ -72,9 +54,5 @@ module.exports = function(Topics) {
 	Topics.updateRecent = function(tid, timestamp, callback) {
 		callback = callback || function() {};
 		db.sortedSetAdd('topics:recent', timestamp, tid, callback);
-	};
-
-	Topics.removeRecent = function(tid, callback) {
-		db.sortedSetRemove('topics:recent', tid, callback);
 	};
 };

@@ -81,7 +81,9 @@ module.exports = function(db, module) {
 		if (!key) {
 			return callback();
 		}
-		db.collection('objects').remove({_key: key}, callback);
+		db.collection('objects').remove({_key: key}, function(err, res) {
+			callback(err);
+		});
 	};
 
 	module.deleteAll = function(keys, callback) {
@@ -118,7 +120,7 @@ module.exports = function(db, module) {
 
 	module.rename = function(oldKey, newKey, callback) {
 		callback = callback || helpers.noop;
-		db.collection('objects').update({_key: oldKey}, {$set:{_key: newKey}}, callback);
+		db.collection('objects').update({_key: oldKey}, {$set:{_key: newKey}}, {multi: true}, callback);
 	};
 
 	module.expire = function(key, seconds, callback) {

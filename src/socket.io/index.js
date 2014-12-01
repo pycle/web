@@ -1,103 +1,157 @@
 "use strict";
 
 var	SocketIO = require('socket.io'),
-	socketioWildcard = require('socket.io-wildcard'),
+	socketioWildcard = require('socketio-wildcard')(),
 	util = require('util'),
 	async = require('async'),
 	path = require('path'),
 	fs = require('fs'),
 	nconf = require('nconf'),
-	socketCookieParser = require('cookie-parser')(nconf.get('secret')),
+	cookieParser = require('cookie-parser')(nconf.get('secret')),
 	winston = require('winston'),
 
 	db = require('../database'),
 	user = require('../user'),
 	topics = require('../topics'),
 	logger = require('../logger'),
-	meta = require('../meta'),
+	ratelimit = require('../middleware/ratelimit'),
 
 	Sockets = {},
 	Namespaces = {};
 
-/* === */
+var io;
 
+Sockets.init = function(server) {
+	requireModules();
 
-var	io;
+	io = new SocketIO({
+		path: nconf.get('relative_path') + '/socket.io'
+	});
 
-var onlineUsers = [];
+	addRedisAdapter(io);
 
-process.on('message', onMessage);
+	io.use(socketioWildcard);
+	io.use(authorize);
 
-function onMessage(msg) {
-	if (typeof msg !== 'object') {
+	io.on('connection', onConnection);
+
+	io.listen(server, {
+		transports: ['websocket', 'polling']
+	});
+
+	Sockets.server = io;
+};
+
+function onConnection(socket) {
+	socket.ip = socket.request.connection.remoteAddress;
+
+	logger.io_one(socket, socket.uid);
+
+	onConnect(socket);
+
+	socket.on('disconnect', function() {
+		onDisconnect(socket);
+	});
+
+	socket.on('*', function(payload) {
+		onMessage(socket, payload);
+	});
+}
+
+function onConnect(socket) {
+	if (socket.uid) {
+		socket.join('uid_' + socket.uid);
+		socket.join('online_users');
+
+		async.parallel({
+			user: function(next) {
+				user.getUserFields(socket.uid, ['username', 'userslug', 'picture', 'status'], next);
+			},
+			isAdmin: function(next) {
+				user.isAdministrator(socket.uid, next);
+			}
+		}, function(err, userData) {
+			if (err || !userData.user) {
+				return;
+			}
+			socket.emit('event:connect', {
+				username: userData.user.username,
+				userslug: userData.user.userslug,
+				picture: userData.user.picture,
+				isAdmin: userData.isAdmin,
+				uid: socket.uid
+			});
+
+			socket.broadcast.emit('event:user_status_change', {uid: socket.uid, status: userData.user.status});
+		});
+	} else {
+		socket.join('online_guests');
+		socket.emit('event:connect', {
+			username: '[[global:guest]]',
+			isAdmin: false,
+			uid: 0
+		});
+	}
+}
+
+function onDisconnect(socket) {
+	if (socket.uid) {
+		var socketCount = Sockets.getUserSocketCount(socket.uid);
+		if (socketCount <= 0) {
+			socket.broadcast.emit('event:user_status_change', {uid: socket.uid, status: 'offline'});
+		}
+
+		// TODO: if we can get socket.rooms here this can be made more efficient,
+		// see https://github.com/Automattic/socket.io/issues/1897
+		io.sockets.in('online_users').emit('event:user_leave', socket.uid);
+	}
+}
+
+function onMessage(socket, payload) {
+	if (!payload.data.length) {
+		return winston.warn('[socket.io] Empty payload');
+	}
+
+	var eventName = payload.data[0];
+	var params = payload.data[1];
+	var callback = typeof payload.data[payload.data.length - 1] === 'function' ? payload.data[payload.data.length - 1] : function() {};
+
+	if (!eventName) {
+		return winston.warn('[socket.io] Empty method name');
+	}
+
+	if (ratelimit.isFlooding(socket)) {
+		winston.warn('[socket.io] Too many emits! Disconnecting uid : ' + socket.uid + '. Message : ' + payload.name);
+		return socket.disconnect();
+	}
+
+	var parts = eventName.toString().split('.'),
+		namespace = parts[0],
+		methodToCall = parts.reduce(function(prev, cur) {
+			if (prev !== null && prev[cur]) {
+				return prev[cur];
+			} else {
+				return null;
+			}
+		}, Namespaces);
+
+	if(!methodToCall) {
+		if (process.env.NODE_ENV === 'development') {
+			winston.warn('[socket.io] Unrecognized message: ' + eventName);
+		}
 		return;
 	}
 
-	if (msg.action === 'user:connect') {
-		if (msg.uid && onlineUsers.indexOf(msg.uid) === -1) {
-			onlineUsers.push(msg.uid);
-		}
-	} else if(msg.action === 'user:disconnect') {
-		if (msg.uid && msg.socketCount <= 1) {
-			var index = onlineUsers.indexOf(msg.uid);
-			if (index !== -1) {
-				onlineUsers.splice(index, 1);
-			}
-		}
-	}
-}
-
-function onUserConnect(uid, socketid) {
-	var msg = {action: 'user:connect', uid: uid, socketid: socketid};
-	if (process.send) {
-		process.send(msg);
-	} else {
-		onMessage(msg);
-	}
-}
-
-function onUserDisconnect(uid, socketid, socketCount) {
-	var msg = {action: 'user:disconnect', uid: uid, socketid: socketid, socketCount: socketCount};
-	if (process.send) {
-		process.send(msg);
-	} else {
-		onMessage(msg);
-	}
-}
-
-Sockets.init = function(server) {
-	// Default socket.io config
-	var config = {
-			log: false,
-			transports: ['websocket', 'xhr-polling', 'jsonp-polling', 'flashsocket'],
-			'browser client minification': true,
-			resource: nconf.get('relative_path') + '/socket.io'
-		};
-
-	// If a redis server is configured, use it as a socket.io store, otherwise, fall back to in-memory store
-	if (nconf.get('redis')) {
-		var RedisStore = require('socket.io/lib/stores/redis'),
-			database = require('../database/redis'),
-			pub = database.connect(),
-			sub = database.connect(),
-			client = database.connect();
-
-		// "redis" property needs to be passed in as referenced here: https://github.com/Automattic/socket.io/issues/808
-		// Probably fixed in socket.IO 1.0
-		config.store = new RedisStore({
-			redis: require('redis'),
-			redisPub : pub,
-			redisSub : sub,
-			redisClient : client
+	if (Namespaces[namespace].before) {
+		Namespaces[namespace].before(socket, eventName, function() {
+			callMethod(methodToCall, socket, params, callback);
 		});
-	} else if (nconf.get('cluster')) {
-		winston.warn('[socket.io] Clustering detected, you are advised to configure Redis as a websocket store.');
+	} else {
+		callMethod(methodToCall, socket, params, callback);
 	}
+}
 
-	io = socketioWildcard(SocketIO).listen(server, config);
-
-	Sockets.server = io;
-
+function requireModules() {
 	fs.readdir(__dirname, function(err, files) {
 		files.splice(files.indexOf('index.js'), 1);
 
@@ -110,272 +164,116 @@ Sockets.init = function(server) {
 			next();
 		});
 	});
+}
 
-	io.sockets.on('connection', function(socket) {
-		var hs = socket.handshake,
-			sessionID, uid;
+function authorize(socket, next) {
+	var handshake = socket.request,
+		sessionID;
 
-		if (!hs) {
-			return;
+	if (!handshake) {
+		return next(new Error('[[error:not-authorized]]'));
+	}
+
+	cookieParser(handshake, {}, function(err) {
+		if (err) {
+			return next(err);
 		}
 
-		// Validate the session, if present
-		socketCookieParser(hs, {}, function(err) {
-			if(err) {
-				return winston.error(err.message);
+		var sessionID = handshake.signedCookies['express.sid'];
+
+		db.sessionStore.get(sessionID, function(err, sessionData) {
+			if (err) {
+				return next(err);
 			}
 
-			sessionID = socket.handshake.signedCookies['express.sid'];
-			db.sessionStore.get(sessionID, function(err, sessionData) {
-				if (!err && sessionData && sessionData.passport && sessionData.passport.user) {
-					uid = parseInt(sessionData.passport.user, 10);
-				} else {
-					uid = 0;
-				}
-
-				socket.uid = parseInt(uid, 10);
-				onUserConnect(uid, socket.id);
-
-				/* If meta.config.loggerIOStatus > 0, logger.io_one will hook into this socket */
-				logger.io_one(socket, uid);
-
-				if (uid) {
-					socket.join('uid_' + uid);
-					socket.join('online_users');
-
-					async.parallel({
-						user: function(next) {
-							user.getUserFields(uid, ['username', 'userslug', 'picture', 'status'], next);
-						},
-						isAdmin: function(next) {
-							user.isAdministrator(uid, next);
-						}
-					}, function(err, userData) {
-						if (err || !userData.user) {
-							return;
-						}
-						socket.emit('event:connect', {
-							status: 1,
-							username: userData.user.username,
-							userslug: userData.user.userslug,
-							picture: userData.user.picture,
-							isAdmin: userData.isAdmin,
-							uid: uid
-						});
-
-						socket.broadcast.emit('event:user_status_change', {uid:uid, status: userData.user.status});
-					});
-
-				} else {
-					socket.join('online_guests');
-					socket.emit('event:connect', {
-						status: 1,
-						username: '[[global:guest]]',
-						isAdmin: false,
-						uid: 0
-					});
-				}
-			});
-		});
-
-		socket.on('disconnect', function() {
-			var socketCount = Sockets.getUserSocketCount(uid);
-			if (uid && socketCount <= 1) {
-				socket.broadcast.emit('event:user_status_change', {uid: uid, status: 'offline'});
-				emitOnlineUserCount();
-			}
-
-			onUserDisconnect(uid, socket.id, socketCount);
-
-			for(var roomName in io.sockets.manager.roomClients[socket.id]) {
-				if (roomName.indexOf('topic') !== -1) {
-					io.sockets.in(roomName.slice(1)).emit('event:user_leave', socket.uid);
-				}
-			}
-		});
-
-		socket.on('*', function(payload, callback) {
-			function callMethod(method) {
-				method.call(null, socket, payload.args.length ? payload.args[0] : null, function(err, result) {
-					if (callback) {
-						callback(err?{message:err.message}:null, result);
-					}
-				});
-			}
-
-			if(!payload.name) {
-				return winston.warn('[socket.io] Empty method name');
-			}
-
-			var parts = payload.name.toString().split('.'),
-				namespace = parts[0],
-				methodToCall = parts.reduce(function(prev, cur) {
-					if (prev !== null && prev[cur]) {
-						return prev[cur];
-					} else {
-						return null;
-					}
-				}, Namespaces);
-
-			if(!methodToCall) {
-				if (process.env.NODE_ENV === 'development') {
-					winston.warn('[socket.io] Unrecognized message: ' + payload.name);
-				}
-				return;
-			}
-
-			if (Namespaces[namespace].before) {
-				Namespaces[namespace].before(socket, payload.name, function() {
-					callMethod(methodToCall);
-				});
+			if (sessionData && sessionData.passport && sessionData.passport.user) {
+				socket.uid = parseInt(sessionData.passport.user, 10);
 			} else {
-				callMethod(methodToCall);
+				socket.uid = 0;
 			}
+			next();
 		});
 	});
-};
+}
+
+function addRedisAdapter(io) {
+	if (nconf.get('redis')) {
+		var redisAdapter = require('socket.io-redis');
+		var redis = require('../database/redis');
+		var pub = redis.connect({return_buffers: true});
+		var sub = redis.connect({return_buffers: true});
+
+		io.adapter(redisAdapter({pubClient: pub, subClient: sub}));
+	} else {
+		winston.warn('[socket.io] Clustering detected, you are advised to configure Redis as a websocket store.');
+	}
+}
+
+function callMethod(method, socket, params, callback) {
+	method.call(null, socket, params, function(err, result) {
+		callback(err ? {message: err.message} : null, result);
+	});
+}
 
 Sockets.logoutUser = function(uid) {
-	Sockets.getUserSockets(uid).forEach(function(socket) {
-		if (socket.handshake && socket.handshake.signedCookies && socket.handshake.signedCookies['express.sid']) {
-			db.sessionStore.destroy(socket.handshake.signedCookies['express.sid']);
-		}
-
-		socket.emit('event:disconnect');
-		socket.disconnect();
-	});
-};
-
-Sockets.emitUserCount = function() {
-	user.count(function(err, count) {
-		io.sockets.emit('user.count', err ? {message:err.message} : null, count);
-	});
+	io.sockets.in('uid_' + uid).emit('event:disconnect');
 };
 
 Sockets.in = function(room) {
 	return io.sockets.in(room);
 };
 
-Sockets.uidInRoom = function(uid, room) {
-	var userSocketIds = io.sockets.manager.rooms['/uid_' + uid];
-	if (!Array.isArray(userSocketIds) || !userSocketIds.length) {
-		return false;
-	}
-
-	var roomSocketIds = io.sockets.manager.rooms['/' + room];
-	if (!Array.isArray(roomSocketIds) || !roomSocketIds.length) {
-		return false;
-	}
-
-	for (var i=0; i<userSocketIds.length; ++i) {
-		if (roomSocketIds.indexOf(userSocketIds[i]) !== -1) {
-			return true;
-		}
-	}
-	return false;
-};
-
 Sockets.getSocketCount = function() {
-	var clients = io.sockets.manager.rooms[''];
+	// TODO: io.sockets.adapter.sids is local to this worker
+	// use redis-adapter
+
+	var clients = Object.keys(io.sockets.adapter.sids || {});
 	return Array.isArray(clients) ? clients.length : 0;
 };
 
-Sockets.getConnectedClients = function() {
-	return onlineUsers;
-};
-
 Sockets.getUserSocketCount = function(uid) {
-	var roomClients = io.sockets.manager.rooms['/uid_' + uid];
-	if(!Array.isArray(roomClients)) {
-		return 0;
-	}
-	return roomClients.length;
-};
+	// TODO: io.sockets.adapter.rooms is local to this worker
+	// use .clients('uid_' + uid, fn)
 
-Sockets.getOnlineUserCount = function () {
-	return onlineUsers.length;
+	var roomClients = Object.keys(io.sockets.adapter.rooms['uid_' + uid] || {});
+	return Array.isArray(roomClients) ? roomClients.length : 0;
 };
 
 Sockets.getOnlineAnonCount = function () {
-	var guestRoom = io.sockets.manager.rooms['/online_guests'];
-	if (!Array.isArray(guestRoom)) {
-		return 0;
-	}
-	return guestRoom.length;
+	// TODO: io.sockets.adapter.rooms is local to this worker
+	// use .clients()
+
+	var guestSocketIds = Object.keys(io.sockets.adapter.rooms.online_guests || {});
+	return Array.isArray(guestSocketIds) ? guestSocketIds.length : 0;
 };
-
-Sockets.getUserSockets = function(uid) {
-	var sockets = io.sockets.clients();
-	if(!sockets || !sockets.length) {
-		return [];
-	}
-
-	uid = parseInt(uid, 10);
-
-	sockets = sockets.filter(function(s) {
-		return s.uid === uid;
-	});
-
-	return sockets;
-};
-
-Sockets.getUserRooms = function(uid) {
-	var rooms = {};
-	var uidSocketIds = io.sockets.manager.rooms['/uid_' + uid];
-	if (!Array.isArray(uidSocketIds)) {
-		return [];
-	}
-	for (var i=0; i<uidSocketIds.length; ++i) {
-		var roomClients = io.sockets.manager.roomClients[uidSocketIds[i]];
-	 	for (var roomName in roomClients) {
-	 		if (roomName && roomClients.hasOwnProperty(roomName)) {
-	 			rooms[roomName.slice(1)] = true;
-	 		}
-	 	}
-	}
-
-	rooms = Object.keys(rooms);
-	return rooms;
-};
-
-
-/* Helpers */
 
 Sockets.reqFromSocket = function(socket) {
-	var headers = socket.handshake.headers,
+	var headers = socket.request.headers,
 		host = headers.host,
 		referer = headers.referer || '';
 
 	return {
-		ip: headers['x-forwarded-for'] || (socket.handshake.address || {}).address,
+		ip: socket.ip,
 		host: host,
-		protocol: headers.secure ? 'https' : 'http',
-		secure: !!headers.secure,
+		protocol: socket.request.connection.encrypted ? 'https' : 'http',
+		secure: !!socket.request.connection.encrypted,
 		url: referer,
 		path: referer.substr(referer.indexOf(host) + host.length),
 		headers: headers
 	};
 };
 
-Sockets.isUserOnline = isUserOnline;
-function isUserOnline(uid) {
-	if (!io) {
-		// Special handling for install script (socket.io not initialised)
-		return false;
-	}
-
-	return Array.isArray(io.sockets.manager.rooms['/uid_' + uid]);
-}
-
-Sockets.isUsersOnline = function(uids, callback) {
-	var data = uids.map(isUserOnline);
-
-	callback(null, data);
+Sockets.isUserOnline = function(uid) {
+	// TODO: io.sockets.adapter.rooms is local to this worker
+	// use .clients('uid_' + uid, fn)
+	return io ? !!io.sockets.adapter.rooms['uid_' + uid] : false;
 };
 
-Sockets.updateRoomBrowsingText = updateRoomBrowsingText;
-function updateRoomBrowsingText(roomName, selfUid) {
+Sockets.isUsersOnline = function(uids, callback) {
+	callback(null, uids.map(Sockets.isUserOnline));
+};
 
+Sockets.updateRoomBrowsingText = function (roomName, selfUid) {
 	if (!roomName) {
 		return;
 	}
@@ -404,21 +302,23 @@ function updateRoomBrowsingText(roomName, selfUid) {
 			total: Math.max(0, total - uids.length)
 		});
 	});
-}
+};
 
 Sockets.getUidsInRoom = function(roomName) {
+	// TODO : doesnt work in cluster
+
 	var uids = [];
-	roomName = roomName ? '/' + roomName : '';
-	var socketids = io.sockets.manager.rooms[roomName];
-	if (!Array.isArray(socketids)) {
+
+	var socketids = Object.keys(io.sockets.adapter.rooms[roomName] || {});
+	if (!Array.isArray(socketids) || !socketids.length) {
 		return [];
 	}
 
 	for(var i=0; i<socketids.length; ++i) {
-		var socketRooms = Object.keys(io.sockets.manager.roomClients[socketids[i]]);
+		var socketRooms = Object.keys(io.sockets.adapter.sids[socketids[i]]);
 		if (Array.isArray(socketRooms)) {
 			socketRooms.forEach(function(roomName) {
-				if (roomName.indexOf('/uid_') === 0 ) {
+				if (roomName.indexOf('uid_') === 0 ) {
 					uids.push(roomName.split('_')[1]);
 				}
 			});
@@ -427,44 +327,6 @@ Sockets.getUidsInRoom = function(roomName) {
 
 	return uids;
 };
-
-Sockets.emitTopicPostStats = emitTopicPostStats;
-function emitTopicPostStats(callback) {
-	db.getObjectFields('global', ['topicCount', 'postCount'], function(err, data) {
-		if (err) {
-			return winston.err(err);
-		}
-
-		var stats = {
-			topics: data.topicCount ? data.topicCount : 0,
-			posts: data.postCount ? data.postCount : 0
-		};
-
-		if (!callback) {
-			io.sockets.in('online_users').emit('meta.getUsageStats', null, stats);
-		} else {
-			callback(null, stats);
-		}
-	});
-}
-
-Sockets.emitOnlineUserCount = emitOnlineUserCount;
-function emitOnlineUserCount(callback) {
-	var anon = Sockets.getOnlineAnonCount();
-	var registered = Sockets.getOnlineUserCount();
-
-	var returnObj = {
-		users: registered + anon,
-		anon: anon
-	};
-
-	if (callback) {
-		callback(null, returnObj);
-	} else {
-		io.sockets.in('online_users').emit('user.getActiveUsers', null, returnObj);
-	}
-}
-
 
 
 /* Exporting */

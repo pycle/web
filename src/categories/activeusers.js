@@ -19,9 +19,9 @@ module.exports = function(Categories) {
 					return post.uid;
 				}).filter(function(uid, index, array) {
 					return parseInt(uid, 10) !== 0 && array.indexOf(uid) === index;
-				}).slice(0, 24);
+				});
 
-				callback(null, uids);
+				next(null, uids);
 			}
 		], callback);
 	};

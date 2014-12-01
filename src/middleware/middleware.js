@@ -6,9 +6,11 @@ var app,
 	},
 	async = require('async'),
 	path = require('path'),
+	csrf = require('csurf'),
 	winston = require('winston'),
 	validator = require('validator'),
 	nconf = require('nconf'),
+
 	plugins = require('./../plugins'),
 	meta = require('./../meta'),
 	translator = require('./../../public/src/translator'),
@@ -18,7 +20,6 @@ var app,
 	topics = require('./../topics'),
 	messaging = require('../messaging'),
 	ensureLoggedIn = require('connect-ensure-login'),
-	csrf = require('csurf'),
 
 	controllers = {
 		api: require('./../controllers/api')
@@ -41,8 +42,9 @@ middleware.applyCSRF = csrf();
 middleware.ensureLoggedIn = ensureLoggedIn.ensureLoggedIn();
 
 middleware.updateLastOnlineTime = function(req, res, next) {
-	if(req.user) {
+	if (req.user) {
 		user.updateLastOnlineTime(req.user.uid);
+		user.updateOnlineUsers(req.user.uid);
 	}
 
 	db.sortedSetScore('ip:recent', req.ip, function(err, score) {
@@ -195,25 +197,80 @@ middleware.checkAccountPermissions = function(req, res, next) {
 	});
 };
 
+middleware.buildBreadcrumbs = function(req, res, next) {
+	var breadcrumbs = [],
+		findParents = function(cid) {
+			var currentCategory;
+			async.doWhilst(function(next) {
+				categories.getCategoryFields(currentCategory ? currentCategory.parentCid : cid, ['name', 'slug', 'parentCid'], function(err, data) {
+					if (err) {
+						return next(err);
+					}
+
+					breadcrumbs.unshift({
+						text: data.name,
+						url: nconf.get('relative_path') + '/category/' + data.slug
+					});
+
+					currentCategory = data;
+					next();
+				});
+			}, function() {
+				return !!currentCategory.parentCid && currentCategory.parentCid !== '0';
+			}, function(err) {
+				if (err) {
+					winston.warn('[buildBreadcrumb] Could not build breadcrumbs: ' + err.message);
+				}
+
+				// Home breadcrumb
+				translator.translate('[[global:home]]', meta.config.defaultLang || 'en_GB', function(translated) {
+					breadcrumbs.unshift({
+						text: translated,
+						url: nconf.get('relative_path')
+					});
+
+					res.locals.breadcrumbs = breadcrumbs || [];
+					next();
+				});
+			});
+		};
+
+	if (req.params.topic_id) {
+		topics.getTopicFields(parseInt(req.params.topic_id, 10), ['cid', 'title', 'slug'], function(err, data) {
+			breadcrumbs.unshift({
+				text: data.title,
+				url: nconf.get('relative_path') + '/topic/' + data.slug
+			});
+
+			findParents(parseInt(data.cid, 10));
+		});
+	} else {
+		findParents(parseInt(req.params.category_id, 10));
+	}
+};
+
 middleware.buildHeader = function(req, res, next) {
 	res.locals.renderHeader = true;
-	async.parallel({
-		config: function(next) {
-			controllers.api.getConfig(req, res, next);
-		},
-		footer: function(next) {
-			app.render('footer', {}, next);
-		}
-	}, function(err, results) {
-		if (err) {
-			return next(err);
-		}
 
-		res.locals.config = results.config;
+	middleware.applyCSRF(req, res, function() {
+		async.parallel({
+			config: function(next) {
+				controllers.api.getConfig(req, res, next);
+			},
+			footer: function(next) {
+				app.render('footer', {}, next);
+			}
+		}, function(err, results) {
+			if (err) {
+				return next(err);
+			}
 
-		translator.translate(results.footer, results.config.defaultLang, function(parsedTemplate) {
-			res.locals.footer = parsedTemplate;
-			next();
+			res.locals.config = results.config;
+
+			translator.translate(results.footer, results.config.defaultLang, function(parsedTemplate) {
+				res.locals.footer = parsedTemplate;
+				next();
+			});
 		});
 	});
 };
@@ -260,7 +317,6 @@ middleware.renderHeader = function(req, res, callback) {
 				'cache-buster': meta.config['cache-buster'] ? 'v=' + meta.config['cache-buster'] : '',
 				'brand:logo': meta.config['brand:logo'] || '',
 				'brand:logo:display': meta.config['brand:logo']?'':'hide',
-				csrf: req.csrfToken ? req.csrfToken() : undefined,
 				navigation: custom_header.navigation,
 				allowRegistration: meta.config.allowRegistration === undefined || parseInt(meta.config.allowRegistration, 10) === 1,
 				searchEnabled: plugins.hasListeners('filter:search.query')
@@ -302,25 +358,10 @@ middleware.renderHeader = function(req, res, callback) {
 		async.parallel({
 			customCSS: function(next) {
 				templateValues.useCustomCSS = parseInt(meta.config.useCustomCSS, 10) === 1;
-				if (!templateValues.useCustomCSS) {
+				if (!templateValues.useCustomCSS || !meta.config.customCSS || !meta.config.renderedCustomCSS) {
 					return next(null, '');
 				}
-
-				var less = require('less');
-				var parser = new (less.Parser)();
-
-				if (!meta.config.customCSS) {
-					return next(null, '');
-				}
-
-				parser.parse(meta.config.customCSS, function(err, tree) {
-					if (err) {
-						winston.error('[less] Could not convert custom LESS to CSS! Please check your syntax.');
-						return next(null, '');
-					}
-
-					next(null, tree ? tree.toCSS({cleancss: true}) : '');
-				});
+				next(null, meta.config.renderedCustomCSS);
 			},
 			customJS: function(next) {
 				templateValues.useCustomJS = parseInt(meta.config.useCustomJS, 10) === 1;
@@ -394,6 +435,8 @@ middleware.processRender = function(req, res, next) {
 		}
 
 		options.loggedIn = req.user ? parseInt(req.user.uid, 10) !== 0 : false;
+		options.template = {};
+		options.template[template] = true;
 
 		if ('function' !== typeof fn) {
 			fn = defaultFn;
@@ -447,6 +490,9 @@ middleware.addExpiresHeaders = function(req, res, next) {
 	if (app.enabled('cache')) {
 		res.setHeader("Cache-Control", "public, max-age=5184000");
 		res.setHeader("Expires", new Date(Date.now() + 5184000000).toUTCString());
+	} else {
+		res.setHeader("Cache-Control", "public, max-age=0");
+		res.setHeader("Expires", new Date().toUTCString());
 	}
 
 	next();

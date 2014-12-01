@@ -16,7 +16,7 @@ var async = require('async'),
 module.exports = function(Posts) {
 
 	Posts.getPostSummaryByPids = function(pids, uid, options, callback) {
-		if (!pids || !Array.isArray(pids) || !pids.length) {
+		if (!Array.isArray(pids) || !pids.length) {
 			return callback(null, []);
 		}
 
@@ -105,7 +105,7 @@ module.exports = function(Posts) {
 	};
 
 	function getTopicAndCategories(topicKeys, callback) {
-		db.getObjectsFields(topicKeys, ['uid', 'tid', 'title', 'cid', 'slug', 'deleted'], function(err, topics) {
+		db.getObjectsFields(topicKeys, ['uid', 'tid', 'title', 'cid', 'slug', 'deleted', 'postcount'], function(err, topics) {
 			if (err) {
 				return callback(err);
 			}

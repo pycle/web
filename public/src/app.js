@@ -78,7 +78,7 @@ var socket,
 			var ioParams = {
 				'max reconnection attempts': config.maxReconnectionAttempts,
 				'reconnection delay': config.reconnectionDelay,
-				resource: RELATIVE_PATH.length ? RELATIVE_PATH.slice(1) + '/socket.io' : 'socket.io'
+				path: RELATIVE_PATH + '/socket.io'
 			};
 
 			if (utils.isAndroidBrowser()) {
@@ -149,6 +149,10 @@ var socket,
 
 			app.cacheBuster = config['cache-buster'];
 
+			require(['csrf'], function(csrf) {
+				csrf.set(data.csrf_token);
+			});
+
 			bootbox.setDefaults({
 				locale: config.userLang
 			});
@@ -164,8 +168,16 @@ var socket,
 	};
 
 	app.logout = function() {
-		$.post(RELATIVE_PATH + '/logout', function() {
-			window.location.href = RELATIVE_PATH + '/';
+		require(['csrf'], function(csrf) {
+			$.ajax(RELATIVE_PATH + '/logout', {
+				type: 'POST',
+				headers: {
+					'x-csrf-token': csrf.get()
+				},
+				success: function() {
+					window.location.href = RELATIVE_PATH + '/';
+				}
+			});
 		});
 	};
 
@@ -207,7 +219,6 @@ var socket,
 
 			socket.emit('meta.rooms.enter', {
 				enter: room,
-				leave: app.currentRoom,
 				username: app.username,
 				userslug: app.userslug,
 				picture: app.picture
@@ -258,8 +269,8 @@ var socket,
 		selector = selector || $('a');
 		selector.each(function() {
 			var href = $(this).attr('href');
-			if (href && app.userslug) {
-				$(this).attr('href', href.replace(/\[self\]/g, app.userslug));
+			if (href && app.userslug && href.indexOf('user/_self_') !== -1) {
+				$(this).attr('href', href.replace(/user\/_self_/g, 'user/' + app.userslug));
 			}
 		});
 	};
@@ -477,14 +488,16 @@ var socket,
 				});
 
 			Mousetrap.bind('ctrl+f', function(e) {
-				// If in topic, open search window and populate, otherwise regular behaviour
-				var match = ajaxify.currentPage.match(/^topic\/([\d]+)/),
-					tid;
-				if (match) {
-					e.preventDefault();
-					tid = match[1];
-					searchInput.val('in:topic-' + tid + ' ');
-					prepareSearch();
+				if (config.topicSearchEnabled) {
+					// If in topic, open search window and populate, otherwise regular behaviour
+					var match = ajaxify.currentPage.match(/^topic\/([\d]+)/),
+						tid;
+					if (match) {
+						e.preventDefault();
+						tid = match[1];
+						searchInput.val('in:topic-' + tid + ' ');
+						prepareSearch();
+					}
 				}
 			});
 		});
@@ -531,7 +544,9 @@ var socket,
 
 			handleStatusChange();
 
-			handleSearch();
+			if (config.searchEnabled) {
+				handleSearch();
+			}
 
 			$('#logout-link').on('click', app.logout);
 

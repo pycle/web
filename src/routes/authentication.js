@@ -56,7 +56,7 @@
 					}));
 				});
 
-				router.post('/logout', logout);
+				router.post('/logout', Auth.middleware.applyCSRF, logout);
 				router.post('/register', Auth.middleware.applyCSRF, register);
 				router.post('/login', Auth.middleware.applyCSRF, login);
 
@@ -82,7 +82,7 @@
 			},
 			function(_uid, next) {
 				if (!_uid) {
-					return next(null, false, '[[error:no-user]]');
+					return next(new Error('[[error:no-user]]'));
 				}
 				uid = _uid;
 				user.auth.logAttempt(uid, next);
@@ -95,13 +95,13 @@
 					return next(new Error('[[error:invalid-user-data]]'));
 				}
 				if (userData.banned && parseInt(userData.banned, 10) === 1) {
-					return next(null, false, '[[error:user-banned]]');
+					return next(new Error('[[error:user-banned]]'));
 				}
 				Password.compare(password, userData.password, next);
 			},
 			function(passwordMatch, next) {
 				if (!passwordMatch) {
-					return next(null, false, '[[error:invalid-password]]');
+					return next(new Error('[[error:invalid-password]]'));
 				}
 				user.auth.clearLoginAttempts(uid);
 				next(null, {uid: uid}, '[[success:authentication-successful]]');
@@ -147,8 +147,7 @@
 	function continueLogin(req, res, next) {
 		passport.authenticate('local', function(err, userData, info) {
 			if (err) {
-				req.flash('error', info);
-				return res.redirect(nconf.get('relative_path') + '/login');
+				return res.status(403).send(err.message);
 			}
 
 			if (!userData) {
@@ -156,8 +155,7 @@
 					info = '[[error:invalid-username-or-password]]';
 				}
 
-				req.flash('error', info);
-				return res.redirect(nconf.get('relative_path') + '/login');
+				return res.status(403).send(info);
 			}
 
 			// Alter user cookie depending on passed-in option
@@ -174,8 +172,7 @@
 				uid: userData.uid
 			}, function(err) {
 				if (err) {
-					req.flash('error', err.message);
-					return res.redirect(nconf.get('relative_path') + '/login');
+					return res.status(403).send(err.message);
 				}
 				if (userData.uid) {
 					user.logIP(userData.uid, req.ip);
@@ -184,11 +181,12 @@
 				}
 
 				if (!req.session.returnTo) {
-					res.redirect(nconf.get('relative_path') + '/');
+					res.status(200).send(nconf.get('relative_path') + '/');
 				} else {
 					var next = req.session.returnTo;
 					delete req.session.returnTo;
-					res.redirect(nconf.get('relative_path') + next);
+
+					res.status(200).send(nconf.get('relative_path') + next);
 				}
 			});
 		})(req, res, next);
@@ -196,7 +194,7 @@
 
 	function register(req, res) {
 		if (parseInt(meta.config.allowRegistration, 10) === 0) {
-			return res.status(403).send('');
+			return res.sendStatus(403);
 		}
 
 		var userData = {};
@@ -234,26 +232,24 @@
 			function(next) {
 				user.logIP(uid, req.ip);
 
-				require('../socket.io').emitUserCount();
-
 				user.notifications.sendWelcomeNotification(uid);
 
 				plugins.fireHook('filter:register.complete', {uid: uid, referrer: req.body.referrer}, next);
 			}
 		], function(err, data) {
 			if (err) {
-				req.flash('error', err.message);
-				return res.redirect(nconf.get('relative_path') + '/register');
+				return res.status(400).send(err.message);
 			}
-			res.redirect(nconf.get('relative_path') + (data.referrer ? data.referrer : '/'));
+
+			res.status(200).send(data.referrer ? data.referrer : '/');
 		});
 	}
 
 	function logout(req, res) {
-		if (req.user && parseInt(req.user.uid, 10) > 0) {
+		if (req.user && parseInt(req.user.uid, 10) > 0 && req.sessionID) {
 
 			require('../socket.io').logoutUser(req.user.uid);
-
+			db.sessionStore.destroy(req.sessionID);
 			req.logout();
 		}
 

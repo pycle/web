@@ -15,6 +15,7 @@ var	async = require('async'),
 	groups = require('../groups'),
 	user = require('../user'),
 	websockets = require('./index'),
+	utils = require('../../public/src/utils'),
 
 	SocketPosts = {};
 
@@ -45,59 +46,52 @@ SocketPosts.reply = function(socket, data, callback) {
 
 		socket.emit('event:new_post', result);
 
-		var uids = websockets.getConnectedClients();
-
-		privileges.categories.filterUids('read', postData.topic.cid, uids, function(err, uids) {
+		user.getUidsFromSet('users:online', 0, -1, function(err, uids) {
 			if (err) {
 				return;
 			}
-
-			plugins.fireHook('filter:sockets.sendNewPostToUids', {uidsTo: uids, uidFrom: data.uid, type: "newPost"}, function(err, data) {
-				uids = data.uidsTo;
-
-				for(var i=0; i<uids.length; ++i) {
-					if (parseInt(uids[i], 10) !== socket.uid) {
-						websockets.in('uid_' + uids[i]).emit('event:new_post', result);
-					}
+			privileges.categories.filterUids('read', postData.topic.cid, uids, function(err, uids) {
+				if (err) {
+					return;
 				}
+
+				plugins.fireHook('filter:sockets.sendNewPostToUids', {uidsTo: uids, uidFrom: data.uid, type: "newPost"}, function(err, data) {
+					uids = data.uidsTo;
+
+					for(var i=0; i<uids.length; ++i) {
+						if (parseInt(uids[i], 10) !== socket.uid) {
+							websockets.in('uid_' + uids[i]).emit('event:new_post', result);
+						}
+					}
+				});
 			});
 		});
-
-		websockets.emitTopicPostStats();
 	});
 };
 
 SocketPosts.upvote = function(socket, data, callback) {
-	if (!data || !data.pid) {
-		return callback(new Error('[[error:invalid-data]]'));
-	}
-	favouriteCommand('upvote', 'voted', socket, data, callback);
-	SocketPosts.sendNotificationToPostOwner(data.pid, socket.uid, 'notifications:upvoted_your_post_in');
+	favouriteCommand(socket, 'upvote', 'voted', 'notifications:upvoted_your_post_in', data, callback);
 };
 
 SocketPosts.downvote = function(socket, data, callback) {
-	favouriteCommand('downvote', 'voted', socket, data, callback);
+	favouriteCommand(socket, 'downvote', 'voted', '', data, callback);
 };
 
 SocketPosts.unvote = function(socket, data, callback) {
-	favouriteCommand('unvote', 'voted', socket, data, callback);
+	favouriteCommand(socket, 'unvote', 'voted', '', data, callback);
 };
 
 SocketPosts.favourite = function(socket, data, callback) {
-	if (!data || !data.pid) {
-		return callback(new Error('[[error:invalid-data]]'));
-	}
-	favouriteCommand('favourite', 'favourited', socket, data, callback);
-	SocketPosts.sendNotificationToPostOwner(data.pid, socket.uid, 'notifications:favourited_your_post_in');
+	favouriteCommand(socket, 'favourite', 'favourited', 'notifications:favourited_your_post_in', data, callback);
 };
 
 SocketPosts.unfavourite = function(socket, data, callback) {
-	favouriteCommand('unfavourite', 'favourited', socket, data, callback);
+	favouriteCommand(socket, 'unfavourite', 'favourited', '', data, callback);
 };
 
-function favouriteCommand(command, eventName, socket, data, callback) {
+function favouriteCommand(socket, command, eventName, notification, data, callback) {
 	if(!data || !data.pid || !data.room_id) {
-		return;
+		return callback(new Error('[[error:invalid-data]]'));
 	}
 	async.parallel({
 		exists: function(next) {
@@ -108,7 +102,7 @@ function favouriteCommand(command, eventName, socket, data, callback) {
 		}
 	}, function(err, results) {
 		if (err || !results.exists) {
-			return callback(err);
+			return callback(err || new Error('[[error:invalid-pid]]'));
 		}
 
 		if (parseInt(results.deleted, 10) === 1) {
@@ -122,8 +116,12 @@ function favouriteCommand(command, eventName, socket, data, callback) {
 
 			socket.emit('posts.' + command, result);
 
-			if(data.room_id && result && eventName) {
+			if (result && eventName) {
 				websockets.in(data.room_id).emit('event:' + eventName, result);
+			}
+
+			if (notification) {
+				SocketPosts.sendNotificationToPostOwner(data.pid, socket.uid, notification);
 			}
 			callback();
 		});
@@ -131,7 +129,7 @@ function favouriteCommand(command, eventName, socket, data, callback) {
 }
 
 SocketPosts.sendNotificationToPostOwner = function(pid, fromuid, notification) {
-	if(!pid || !fromuid) {
+	if(!pid || !fromuid || !notification) {
 		return;
 	}
 	posts.getPostFields(pid, ['tid', 'uid', 'content'], function(err, postData) {
@@ -205,7 +203,7 @@ SocketPosts.edit = function(socket, data, callback) {
 			return callback(err);
 		}
 
-		websockets.server.sockets.in('topic_' + results.topic.tid).emit('event:post_edited', {
+		websockets.in('topic_' + results.topic.tid).emit('event:post_edited', {
 			pid: data.pid,
 			title: results.topic.title,
 			isMainPost: results.topic.isMainPost,
@@ -226,19 +224,17 @@ SocketPosts.restore = function(socket, data, callback) {
 };
 
 function deleteOrRestore(command, socket, data, callback) {
-	if(!data) {
+	if (!data) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
 	postTools[command](socket.uid, data.pid, function(err, postData) {
-		if(err) {
+		if (err) {
 			return callback(err);
 		}
 
-		websockets.emitTopicPostStats();
-
 		var eventName = command === 'restore' ? 'event:post_restored' : 'event:post_deleted';
-		websockets.server.sockets.in('topic_' + data.tid).emit(eventName, postData);
+		websockets.in('topic_' + data.tid).emit(eventName, postData);
 
 		callback();
 	});
@@ -253,9 +249,7 @@ SocketPosts.purge = function(socket, data, callback) {
 			return callback(err);
 		}
 
-		websockets.emitTopicPostStats();
-
-		websockets.server.sockets.in('topic_' + data.tid).emit('event:post_purged', data.pid);
+		websockets.in('topic_' + data.tid).emit('event:post_purged', data.pid);
 
 		callback();
 	});
@@ -318,7 +312,7 @@ SocketPosts.flag = function(socket, pid, callback) {
 			posts.getPostFields(pid, ['tid', 'uid', 'content', 'deleted'], next);
 		},
 		function(postData, next) {
-			if (parseInt(postData.deleted) === 1) {
+			if (parseInt(postData.deleted, 10) === 1) {
 				return next(new Error('[[error:post-deleted]]'));
 			}
 			post = postData;
@@ -379,18 +373,18 @@ SocketPosts.loadMoreFavourites = function(socket, data, callback) {
 	var start = parseInt(data.after, 10),
 		end = start + 9;
 
-	posts.getFavourites(socket.uid, start, end, callback);
+	posts.getPostsFromSet('uid:' + socket.uid + ':posts', socket.uid, start, end, callback);
 };
 
 SocketPosts.loadMoreUserPosts = function(socket, data, callback) {
-	if(!data || !data.after || !data.uid) {
+	if(!data || !data.uid || !utils.isNumber(data.after)) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
-	var start = parseInt(data.after, 10),
+	var start = Math.max(0, parseInt(data.after, 10)),
 		end = start + 9;
 
-	posts.getPostsByUid(socket.uid, data.uid, start, end, callback);
+	posts.getPostsFromSet('uid:' + data.uid + ':posts', socket.uid, start, end, callback);
 };
 
 

@@ -3,7 +3,12 @@
 
 /* globals app, ajaxify, define, socket, translator, templates */
 
-define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', 'forum/topic/threadTools'], function(browsing, postTools, threadTools) {
+define('forum/topic/events', [
+	'forum/topic/browsing',
+	'forum/topic/postTools',
+	'forum/topic/threadTools',
+	'forum/topic/posts'
+], function(browsing, postTools, threadTools, posts) {
 
 	var Events = {};
 
@@ -39,6 +44,9 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 		'posts.upvote': togglePostVote,
 		'posts.downvote': togglePostVote,
 		'posts.unvote': togglePostVote,
+
+		'event:new_notification': onNewNotification,
+		'event:new_post': posts.onNewPost,
 
 		'event:topic.notifyTyping': onNotifyTyping,
 		'event:topic.stopNotifyTyping': onStopNotifyTyping
@@ -107,7 +115,7 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 			$(window).trigger('action:posts.edited');
 		});
 
-		if (data.tags && data.tags.length !== $('.tags').first().children().length) {
+		if (data.tags && tagsUpdated(data.tags)) {
 			templates.parse('partials/post_bar', 'tags', {tags: data.tags}, function(html) {
 				var tags = $('.tags');
 
@@ -116,6 +124,19 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 				});
 			});
 		}
+	}
+
+	function tagsUpdated(tags) {
+		if (tags.length !== $('.tags').first().children().length) {
+			return true;
+		}
+
+		for (var i=0; i<tags.length; ++i) {
+			if (!$('.tags .tag-item[data-tag="' + tags[i].value + '"]').length) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	function onPostPurged(pid) {
@@ -169,6 +190,14 @@ define('forum/topic/events', ['forum/topic/browsing', 'forum/topic/postTools', '
 
 		post.find('.upvote').toggleClass('btn-primary upvoted', data.upvote);
 		post.find('.downvote').toggleClass('btn-primary downvoted', data.downvote);
+	}
+
+
+	function onNewNotification(data) {
+		var tid = ajaxify.variables.get('topic_id');
+		if (data && data.tid && parseInt(data.tid, 10) === parseInt(tid, 10)) {
+			socket.emit('topics.markTopicNotificationsRead', tid);
+		}
 	}
 
 	function onNotifyTyping(data) {

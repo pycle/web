@@ -1,7 +1,9 @@
 "use strict";
 
 var	nconf = require('nconf'),
+	net = require('net'),
 	fs = require('fs'),
+	url = require('url'),
 	path = require('path'),
 	cluster = require('cluster'),
 	async = require('async'),
@@ -13,6 +15,9 @@ var	nconf = require('nconf'),
 	output = logrotate({ file: __dirname + '/logs/output.log', size: '1m', keep: 3, compress: true }),
 	silent = process.env.NODE_ENV !== 'development' ? true : false,
 	numProcs,
+	handles = {},
+	handleIndex = 0,
+	server,
 
 	Loader = {
 		timesStarted: 0,
@@ -42,6 +47,7 @@ Loader.init = function(callback) {
 
 	process.on('SIGHUP', Loader.restart);
 	process.on('SIGUSR2', Loader.reload);
+	process.on('SIGTERM', Loader.stop);
 	callback();
 };
 
@@ -67,7 +73,8 @@ Loader.addClusterEvents = function(callback) {
 							worker.send({
 								action: 'js-propagate',
 								cache: Loader.js.cache,
-								map: Loader.js.map
+								map: Loader.js.map,
+								hash: Loader.js.hash
 							});
 						}
 
@@ -75,7 +82,8 @@ Loader.addClusterEvents = function(callback) {
 							worker.send({
 								action: 'css-propagate',
 								cache: Loader.css.cache,
-								acpCache: Loader.css.acpCache
+								acpCache: Loader.css.acpCache,
+								hash: Loader.css.hash
 							});
 						}
 
@@ -98,6 +106,7 @@ Loader.addClusterEvents = function(callback) {
 					case 'js-propagate':
 						Loader.js.cache = message.cache;
 						Loader.js.map = message.map;
+						Loader.js.hash = message.hash;
 
 						otherWorkers = Object.keys(cluster.workers).filter(function(worker_id) {
 							return parseInt(worker_id, 10) !== parseInt(worker.id, 10);
@@ -107,13 +116,15 @@ Loader.addClusterEvents = function(callback) {
 							cluster.workers[worker_id].send({
 								action: 'js-propagate',
 								cache: message.cache,
-								map: message.map
+								map: message.map,
+								hash: message.hash
 							});
 						});
 					break;
 					case 'css-propagate':
 						Loader.css.cache = message.cache;
 						Loader.css.acpCache = message.acpCache;
+						Loader.css.hash = message.hash;
 
 						otherWorkers = Object.keys(cluster.workers).filter(function(worker_id) {
 							return parseInt(worker_id, 10) !== parseInt(worker.id, 10);
@@ -123,7 +134,8 @@ Loader.addClusterEvents = function(callback) {
 							cluster.workers[worker_id].send({
 								action: 'css-propagate',
 								cache: message.cache,
-								acpCache: message.acpCache
+								acpCache: message.acpCache,
+								hash: message.hash
 							});
 						});
 					break;
@@ -132,8 +144,6 @@ Loader.addClusterEvents = function(callback) {
 							Loader.primaryWorker = parseInt(worker.id, 10);
 						}
 					break;
-					case 'user:connect':
-					case 'user:disconnect':
 					case 'config:update':
 						Loader.notifyWorkers(message);
 					break;
@@ -185,6 +195,28 @@ Loader.start = function(callback) {
 		forkWorker(x === 0);
 	}
 
+	var urlObject = url.parse(nconf.get('url'));
+	var port = urlObject.port || nconf.get('port') || nconf.get('PORT') || 4567;
+ 	nconf.set('port', port);
+
+	server = net.createServer(function(connection) {
+		// remove this once node 0.12.x ships, see https://github.com/elad/node-cluster-socket.io/issues/4
+		connection._handle.readStop();
+
+		var workers = clusterWorkers();
+		var worker = workers[workerIndex(connection.remoteAddress, numProcs)];
+
+		if (worker) {
+			handles[handleIndex] = connection._handle;
+
+			worker.send({action: 'sticky-session:connection', handleIndex: handleIndex}, connection);
+			handleIndex ++;
+		} else {
+			console.log('Cant find worker! Worker count : ' + workers.length);
+		}
+
+	}).listen(port);
+
 	if (callback) {
 		callback();
 	}
@@ -201,6 +233,39 @@ function forkWorker(isPrimary) {
 		worker.process.stdout.pipe(output);
 		worker.process.stderr.pipe(output);
 	}
+
+	worker.on('message', function(message) {
+		if (!message || message.action !== 'sticky-session:accept') {
+			return;
+		}
+		var _handle = handles[message.handleIndex];
+
+		if (_handle) {
+			_handle.close();
+
+			delete handles[message.handleIndex];
+		}
+	});
+}
+
+function workerIndex(ip, numProcs) {
+	var s = '';
+	for (var i = 0, _len = ip.length; i < _len; i++) {
+		if (parseInt(ip[i], 10)) {
+			s += ip[i];
+		}
+	}
+	return Number(s) % numProcs || 0;
+}
+
+function clusterWorkers() {
+	var workers = [];
+
+	for(var i in cluster.workers) {
+		workers.push(cluster.workers[i]);
+	}
+
+	return workers;
 }
 
 Loader.restart = function(callback) {
@@ -215,6 +280,18 @@ Loader.reload = function() {
 			action: 'reload'
 		});
 	});
+};
+
+Loader.stop = function() {
+	Object.keys(cluster.workers).forEach(function(id) {
+		// Gracefully close workers
+		cluster.workers[id].kill();
+	});
+
+	// Clean up the pidfile
+	fs.unlinkSync(__dirname + '/pidfile');
+
+	server.close();
 };
 
 Loader.notifyWorkers = function (msg) {

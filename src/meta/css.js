@@ -23,7 +23,7 @@ module.exports = function(Meta) {
 
 	Meta.css.minify = function(callback) {
 		if (!cluster.isWorker || process.env.cluster_setup === 'true') {
-			winston.info('[meta/css] Minifying LESS/CSS');
+			winston.verbose('[meta/css] Minifying LESS/CSS');
 			db.getObjectFields('config', ['theme:type', 'theme:id'], function(err, themeData) {
 				var themeId = (themeData['theme:id'] || 'nodebb-theme-vanilla'),
 					baseThemePath = path.join(nconf.get('themes_path'), (themeData['theme:type'] && themeData['theme:type'] === 'local' ? themeId : 'nodebb-theme-vanilla')),
@@ -68,7 +68,8 @@ module.exports = function(Meta) {
 						process.send({
 							action: 'css-propagate',
 							cache: minified[0],
-							acpCache: minified[1]
+							acpCache: minified[1],
+							hash: Meta.css.hash
 						});
 					}
 
@@ -80,6 +81,7 @@ module.exports = function(Meta) {
 				});
 			});
 		} else {
+			winston.verbose('[meta/css] Cluster worker ' + cluster.worker.id + ' skipping LESS/CSS compilation');
 			if (typeof callback === 'function') {
 				callback();
 			}
@@ -91,7 +93,7 @@ module.exports = function(Meta) {
 
 		fs.writeFile(path.join(__dirname, '../../public/' + file), Meta.css[filename], function(err) {
 			if (!err) {
-				winston.info('[meta/css] ' + file + ' committed to disk.');
+				winston.verbose('[meta/css] ' + file + ' committed to disk.');
 			} else {
 				winston.error('[meta/css] ' + err.message);
 				process.exit(0);
@@ -105,7 +107,7 @@ module.exports = function(Meta) {
 		fs.exists(cachePath, function(exists) {
 			if (exists) {
 				if (!cluster.isWorker || process.env.cluster_setup === 'true') {
-					winston.info('[meta/css] (Experimental) Reading stylesheets from file');
+					winston.verbose('[meta/css] (Experimental) Reading stylesheets from file');
 					async.map([cachePath, acpCachePath], fs.readFile, function(err, files) {
 						Meta.css.cache = files[0];
 						Meta.css.acpCache = files[1];
@@ -124,11 +126,10 @@ module.exports = function(Meta) {
 	};
 
 	function minify(source, paths, destination, callback) {	
-		var	parser = new (less.Parser)({
-				paths: paths
-			});
-
-		parser.parse(source, function(err, tree) {
+		less.render(source, {
+			paths: paths,
+			compress: true
+		}, function(err, lessOutput) {
 			if (err) {
 				winston.error('[meta/css] Could not minify LESS/CSS: ' + err.message);
 				if (typeof callback === 'function') {
@@ -137,27 +138,15 @@ module.exports = function(Meta) {
 				return;
 			}
 
-			var css;
+			Meta.css[destination] = lessOutput.css;
 
-			try {
-				css = tree.toCSS({
-					cleancss: true
-				});
-			} catch (err) {
-				winston.error('[meta/css] Syntax Error: ' + err.message + ' - ' + path.basename(err.filename) + ' on line ' + err.line);
-				if (typeof callback === 'function') {
-					callback(err);
-				}
-				return;
+			if (destination === 'cache') {
+				// Calculate css buster
+				var hasher = crypto.createHash('md5');
+
+				hasher.update(lessOutput.css, 'utf-8');
+				Meta.css.hash = hasher.digest('hex').slice(0, 8);
 			}
-
-			Meta.css[destination] = css;
-
-			// Calculate css buster
-			var hasher = crypto.createHash('md5');
-
-			hasher.update(css, 'utf-8');
-			Meta.css.hash = hasher.digest('hex').slice(0, 8);
 
 			// Save the compiled CSS in public/ so things like nginx can serve it
 			if (!cluster.isWorker || process.env.cluster_setup === 'true') {
@@ -165,7 +154,7 @@ module.exports = function(Meta) {
 			}
 
 			if (typeof callback === 'function') {
-				callback(null, css);
+				callback(null, lessOutput.css);
 			}
 		});
 	}
