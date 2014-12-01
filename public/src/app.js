@@ -615,5 +615,5 @@ var socket,
 	app.loadConfig();
 	app.alternatingTitle('');
 
-	templates.setupWebWorker('/src/templates.js');
+	templates.setupWebWorker(RELATIVE_PATH + '/src/templates.js');
 }());
