@@ -50,7 +50,6 @@ define('forum/topic', [
 
 		addBlockQuoteHandler();
 
-		handleBookmark(tid);
 		paginator.setup('.posts > .post-row', ajaxify.variables.get('postcount'), Topic.toTop, Topic.toBottom, Topic.navigatorCallback, Topic.calculateIndex);
 		handleBookmark(tid);
 
