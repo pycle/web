@@ -12,7 +12,6 @@ var	nconf = require('nconf'),
 	meta = require('../meta'),
 	Messaging = require('../messaging'),
 	user = require('../user'),
-	notifications = require('../notifications'),
 	plugins = require('../plugins'),
 	utils = require('../../public/src/utils'),
 	privileges = require('../privileges'),
@@ -23,7 +22,6 @@ var	nconf = require('nconf'),
 	SocketModules = {
 		composer: {},
 		chats: {},
-		notifications: {},
 		sounds: {},
 		settings: {}
 	};
@@ -35,7 +33,7 @@ SocketModules.composer.push = function(socket, pid, callback) {
 		if (err || !canRead) {
 			return callback(err || new Error('[[error:no-privileges]]'));
 		}
-		posts.getPostFields(pid, ['content', 'tid'], function(err, postData) {
+		posts.getPostFields(pid, ['content', 'tid', 'uid', 'handle'], function(err, postData) {
 			if(err || (!postData && !postData.content)) {
 				return callback(err || new Error('[[error:invalid-pid]]'));
 			}
@@ -61,6 +59,8 @@ SocketModules.composer.push = function(socket, pid, callback) {
 
 				callback(null, {
 					pid: pid,
+					uid: postData.uid,
+					handle: parseInt(meta.config.allowGuestHandles, 10) ? postData.handle : undefined,
 					body: postData.content,
 					title: results.topic.title,
 					topic_thumb: results.topic.thumb,
@@ -114,6 +114,16 @@ SocketModules.composer.stopNotifyTyping = function(socket, data) {
 	server.in('topic_' + data.tid).emit('event:topic.stopNotifyTyping', data);
 };
 
+SocketModules.composer.getFormattingOptions = function(socket, data, callback) {
+	plugins.fireHook('filter:composer.formatting', {
+		options: [
+			{ name: 'tags', className: 'fa fa-tags', mobile: true }
+		]
+	}, function(err, payload) {
+		callback(err, payload.options);
+	});
+};
+
 /* Chat */
 
 SocketModules.chats.get = function(socket, data, callback) {
@@ -159,7 +169,7 @@ SocketModules.chats.send = function(socket, data, callback) {
 		}
 
 		if (parseInt(meta.config.requireEmailConfirmation, 10) === 1 && parseInt(userData['email:confirmed'], 10) !== 1) {
-			return callback(new Error('[[error:email-not-confirmed]]'));
+			return callback(new Error('[[error:email-not-confirmed-chat]]'));
 		}
 
 		Messaging.canMessage(socket.uid, touid, function(err, allowed) {
@@ -244,14 +254,6 @@ SocketModules.chats.getRecentChats = function(socket, data, callback) {
 	Messaging.getRecentChats(socket.uid, start, end, callback);
 };
 
-/* Notifications */
-SocketModules.notifications.markRead = function(socket, nid) {
-	notifications.markRead(nid, socket.uid);
-};
-
-SocketModules.notifications.markAllRead = function(socket, data, callback) {
-	notifications.markAllRead(socket.uid, callback);
-};
 
 /* Sounds */
 SocketModules.sounds.getSounds = function(socket, data, callback) {

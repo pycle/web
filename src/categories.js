@@ -40,10 +40,11 @@ var async = require('async'),
 				topics: function(next) {
 					Categories.getCategoryTopics({
 						cid: data.cid,
+						set: data.set,
+						reverse: data.reverse,
 						start: data.start,
 						stop: data.end,
-						uid: data.uid,
-						targetUid: data.targetUid
+						uid: data.uid
 					}, next);
 				},
 				pageCount: function(next) {
@@ -65,7 +66,7 @@ var async = require('async'),
 
 				plugins.fireHook('filter:category.get', {category: category, uid: data.uid}, function(err, data) {
 					callback(err, data ? data.category : null);
-				});
+				});				
 			});
 		});
 	};
@@ -120,18 +121,12 @@ var async = require('async'),
 			},
 			function(cids, next) {
 				Categories.getCategories(cids, uid, next);
-			},
-			function(categories, next) {
-				categories = categories.filter(function(category) {
-					return !category.disabled;
-				});
-				next(null, categories);
-			}
+			}			
 		], callback);
 	};
 
 	Categories.getModerators = function(cid, callback) {
-		Groups.getMembers('cid:' + cid + ':privileges:mods', function(err, uids) {
+		Groups.getMembers('cid:' + cid + ':privileges:mods', 0, -1, function(err, uids) {
 			if (err || !Array.isArray(uids) || !uids.length) {
 				return callback(err, []);
 			}
@@ -285,10 +280,9 @@ var async = require('async'),
 				Categories.getCategoriesData(cids, next);
 			},
 			function (categories, next) {
-				// Filter categories to isolate children, and remove disabled categories
 				async.map(cids, function(cid, next) {
 					next(null, categories.filter(function(category) {
-						return parseInt(category.parentCid, 10) === parseInt(cid, 10) && !category.disabled;
+						return category && parseInt(category.parentCid, 10) === parseInt(cid, 10);
 					}));
 				}, next);
 			}

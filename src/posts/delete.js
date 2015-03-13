@@ -29,7 +29,7 @@ module.exports = function(Posts) {
 						removeFromCategoryRecentPosts(pid, postData.tid, next);
 					},
 					function(next) {
-						db.sortedSetRemove('posts:flagged', pid, next);
+						Posts.dismissFlag(pid, next);
 					}
 				], function(err) {
 					callback(err, postData);
@@ -126,6 +126,9 @@ module.exports = function(Posts) {
 				function(next) {
 					db.sortedSetsRemove(['posts:pid', 'posts:flagged'], pid, next);
 				},
+				function(next) {
+					Posts.dismissFlag(pid, next);
+				}
 			], function(err) {
 				if (err) {
 					return callback(err);
@@ -168,8 +171,14 @@ module.exports = function(Posts) {
 							topics.decreasePostCount(postData.tid, next);
 						},
 						function(next) {
-							user.incrementUserPostCountBy(postData.uid, -1, next);
+							topics.updateTeaser(postData.tid, next);
 						},
+						function(next) {
+							db.sortedSetIncrBy('cid:' + topicData.cid + ':tids:posts', -1, postData.tid, next);
+						},
+						function(next) {
+							user.incrementUserPostCountBy(postData.uid, -1, next);
+						}
 					], callback);
 				});
 			});

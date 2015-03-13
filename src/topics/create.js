@@ -93,6 +93,7 @@ module.exports = function(Topics) {
 
 	Topics.post = function(data, callback) {
 		var uid = data.uid,
+			handle = data.handle,
 			title = data.title,
 			content = data.content,
 			cid = data.cid;
@@ -134,7 +135,7 @@ module.exports = function(Topics) {
 				Topics.create({uid: uid, title: title, cid: cid, thumb: data.thumb, tags: data.tags}, next);
 			},
 			function(tid, next) {
-				Topics.reply({uid:uid, tid:tid, content:content, req: data.req}, next);
+				Topics.reply({uid:uid, tid:tid, handle: handle, content:content, req: data.req}, next);
 			},
 			function(postData, next) {
 				async.parallel({
@@ -147,14 +148,14 @@ module.exports = function(Topics) {
 								return next(err);
 							}
 							if (settings.followTopicsOnCreate) {
-								threadTools.follow(postData.tid, uid, next);
+								Topics.follow(postData.tid, uid, next);
 							} else {
 								next();
 							}
 						});
 					},
 					topicData: function(next) {
-						Topics.getTopicsByTids([postData.tid], 0, next);
+						Topics.getTopicsByTids([postData.tid], uid, next);
 					}
 				}, next);
 			},
@@ -165,6 +166,7 @@ module.exports = function(Topics) {
 
 				data.topicData = data.topicData[0];
 				data.topicData.unreplied = 1;
+				data.topicData.mainPost = data.postData;
 
 				plugins.fireHook('action:topic.post', data.topicData);
 
@@ -184,6 +186,7 @@ module.exports = function(Topics) {
 		var tid = data.tid,
 			uid = data.uid,
 			toPid = data.toPid,
+			handle = data.handle,
 			content = data.content,
 			postData;
 
@@ -191,7 +194,7 @@ module.exports = function(Topics) {
 			function(next) {
 				async.parallel({
 					exists: function(next) {
-						threadTools.exists(tid, next);
+						Topics.exists(tid, next);
 					},
 					locked: function(next) {
 						Topics.isLocked(tid, next);
@@ -226,7 +229,7 @@ module.exports = function(Topics) {
 				checkContentLength(content, next);
 			},
 			function(next) {
-				posts.create({uid: uid, tid: tid, content: content, toPid: toPid}, next);
+				posts.create({uid: uid, tid: tid, handle: handle, content: content, toPid: toPid, ip: data.req ? data.req.ip : null}, next);
 			},
 			function(data, next) {
 				postData = data;
@@ -241,7 +244,7 @@ module.exports = function(Topics) {
 						posts.getUserInfoForPosts([postData.uid], uid, next);
 					},
 					topicInfo: function(next) {
-						Topics.getTopicFields(tid, ['tid', 'title', 'slug', 'cid'], next);
+						Topics.getTopicFields(tid, ['tid', 'title', 'slug', 'cid', 'postcount'], next);
 					},
 					settings: function(next) {
 						user.getSettings(uid, next);
@@ -258,8 +261,13 @@ module.exports = function(Topics) {
 				postData.user = results.userInfo[0];
 				postData.topic = results.topicInfo;
 
+				// Username override for guests, if enabled
+				if (parseInt(meta.config.allowGuestHandles, 10) === 1 && parseInt(postData.uid, 10) === 0 && data.handle) {
+					postData.user.username = data.handle;
+				}
+
 				if (results.settings.followTopicsOnReply) {
-					threadTools.follow(postData.tid, uid);
+					Topics.follow(postData.tid, uid);
 				}
 				postData.index = results.postIndex - 1;
 				postData.favourited = false;
@@ -273,6 +281,10 @@ module.exports = function(Topics) {
 					Topics.notifyFollowers(postData, uid);
 				}
 
+				if (postData.index > 0) {
+					plugins.fireHook('action:topic.reply', postData);
+				}
+
 				postData.topic.title = validator.escape(postData.topic.title);
 				next(null, postData);
 			}
@@ -282,6 +294,8 @@ module.exports = function(Topics) {
 	function checkContentLength(content, callback) {
 		if (!content || content.length < parseInt(meta.config.miminumPostLength, 10)) {
 			return callback(new Error('[[error:content-too-short, '  + meta.config.minimumPostLength + ']]'));
+		} else if (content.length > parseInt(meta.config.maximumPostLength, 10)) {
+			return callback(new Error('[[error:content-too-long, '  + meta.config.maximumPostLength + ']]'));
 		}
 		callback();
 	}

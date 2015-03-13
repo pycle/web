@@ -9,7 +9,6 @@ var path = require('path'),
 	server,
 	winston = require('winston'),
 	async = require('async'),
-	cluster = require('cluster'),
 
 	emailer = require('./emailer'),
 	meta = require('./meta'),
@@ -19,7 +18,8 @@ var path = require('path'),
 	routes = require('./routes'),
 	emitter = require('./emitter'),
 
-	helpers = require('./../public/src/helpers')();
+	helpers = require('./../public/src/modules/helpers'),
+	net;
 
 if(nconf.get('ssl')) {
 	server = require('https').createServer({
@@ -34,19 +34,34 @@ if(nconf.get('ssl')) {
 	var	port = nconf.get('port');
 
 	module.exports.init = function() {
+		var skipJS, skipLess, fromFile = nconf.get('from-file') || '';
+
 		emailer.registerApp(app);
+
+		if (fromFile.match('js')) {
+			winston.info('[minifier] Minifying client-side JS skipped');
+			skipJS = true;
+		}
+
+		if (fromFile.match('less')) {
+			winston.info('[minifier] Compiling LESS files skipped');
+			skipLess = true;
+		}
 
 		// Preparation dependent on plugins
 		plugins.ready(function() {
 			async.parallel([
-				async.apply(!nconf.get('from-file') ? meta.js.minify : meta.js.getFromFile, app.enabled('minification')),
-				async.apply(!nconf.get('from-file') ? meta.css.minify : meta.css.getFromFile),
+				async.apply(!skipJS ? meta.js.minify : meta.js.getFromFile, app.enabled('minification')),
+				async.apply(!skipLess ? meta.css.minify : meta.css.getFromFile),
 				async.apply(meta.sounds.init)
 			]);
 		});
 
 		middleware = middleware(app);
 		routes(app, middleware);
+
+		// Load server-side template helpers
+		helpers.register();
 
 		// Cache static files on production
 		if (global.env !== 'development') {
@@ -82,11 +97,7 @@ if(nconf.get('ssl')) {
 		console.log(err.stack);
 		if (err.code === 'EADDRINUSE') {
 			winston.error('NodeBB address in use, exiting...');
-			if (cluster.isWorker) {
-				cluster.worker.kill();
-			} else {
-				process.exit(0);
-			}
+			process.exit(0);
 		} else {
 			throw err;
 		}
@@ -99,39 +110,71 @@ if(nconf.get('ssl')) {
 		emitter.emit('nodebb:ready');
 	});
 
+	server.setTimeout(10000);
+
 	module.exports.listen = function(callback) {
 		logger.init(app);
 
-		var	bind_address = ((nconf.get('bind_address') === "0.0.0.0" || !nconf.get('bind_address')) ? '0.0.0.0' : nconf.get('bind_address')) + ':' + port;
-		if (cluster.isWorker) {
-			port = 0;
-		}
-		server.listen(port, nconf.get('bind_address'), function(err) {
+		var isSocket = isNaN(port),
+			args = isSocket ? [port] : [port, nconf.get('bind_address')],
+			bind_address = ((nconf.get('bind_address') === "0.0.0.0" || !nconf.get('bind_address')) ? '0.0.0.0' : nconf.get('bind_address')) + ':' + port,
+			oldUmask;
+
+		args.push(function(err) {
 			if (err) {
-				winston.info('NodeBB was unable to listen on: ' + bind_address);
+				winston.info('[startup] NodeBB was unable to listen on: ' + bind_address);
 				return callback(err);
 			}
 
-			winston.info('NodeBB is now listening on: ' + bind_address);
-			if (process.send) {
-				process.send({
-					action: 'listening',
-					bind_address: bind_address,
-					primary: process.env.handle_jobs === 'true'
-				});
+			winston.info('NodeBB is now listening on: ' + (isSocket ? port : bind_address));
+			if (oldUmask) {
+				process.umask(oldUmask);
 			}
 
 			callback();
 		});
+
+		// Alter umask if necessary
+		if (isSocket) {
+			oldUmask = process.umask('0000');
+			net = require('net');
+			module.exports.testSocket(port, function(err) {
+				if (!err) {
+					server.listen.apply(server, args);
+				} else {
+					winston.error('[startup] NodeBB was unable to secure domain socket access (' + port + ')');
+					winston.error('[startup] ' + err.message);
+					process.exit();
+				}
+			});
+		} else {
+			server.listen.apply(server, args);
+		}
 	};
 
-	process.on('message', function(message, connection) {
-		if (!message || message.action !== 'sticky-session:connection') {
-			return;
-		}
-
-		process.send({action: 'sticky-session:accept', handleIndex: message.handleIndex});
-		server.emit('connection', connection);
-	});
+	module.exports.testSocket = function(socketPath, callback) {
+		async.series([
+			function(next) {
+				fs.exists(socketPath, function(exists) {
+					if (exists) {
+						next();
+					} else {
+						callback();
+					}
+				});
+			},
+			function(next) {
+				var testSocket = new net.Socket();
+				testSocket.on('error', function(err) {
+					next(err.code !== 'ECONNREFUSED' ? err : null);
+				});
+				testSocket.connect({ path: socketPath }, function() {
+					// Something's listening here, abort
+					callback(new Error('port-in-use'));
+				});
+			},
+			async.apply(fs.unlink, socketPath),	// The socket was stale, kick it out of the way
+		], callback);
+	};
 
 }(WebServer));

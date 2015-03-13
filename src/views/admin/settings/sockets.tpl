@@ -6,18 +6,11 @@
 		<form>
 			<div class="form-group">
 				<label for="maxReconnectionAttempts">Max Reconnection Attempts</label>
-				<input class="form-control" id="maxReconnectionAttempts" type="text" value="5" data-field="maxReconnectionAttempts" />
+				<input class="form-control" id="maxReconnectionAttempts" type="text" value="5" placeholder="Default: 5" data-field="maxReconnectionAttempts" />
 			</div>
 			<div class="form-group">
 				<label for="reconnectionDelay">Reconnection Delay</label>
-				<input class="form-control" id="reconnectionDelay" type="text" value="200" data-field="reconnectionDelay" />
-			</div>
-			<div class="form-group">
-				<label for="websocketAddress">Websocket Address</label>
-				<input class="form-control" id="websocketAddress" type="text" data-field="websocketAddress" />
-				<p class="help-block">
-					Leave blank if unsure.
-				</p>
+				<input class="form-control" id="reconnectionDelay" type="text" value="1500" placeholder="Default: 1500" data-field="reconnectionDelay" />
 			</div>
 		</form>
 	</div>

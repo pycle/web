@@ -44,6 +44,12 @@ questions.main = [
 	}
 ];
 
+questions.optional = [
+	{
+		name: 'port',
+		default: 4567
+	}
+];
 
 function checkSetupFlag(next) {
 	var	setupVal;
@@ -117,6 +123,7 @@ function setupConfig(next) {
 	prompt.start();
 	prompt.message = '';
 	prompt.delimiter = '';
+	prompt.colors = false;
 
 	if (!install.values) {
 		prompt.get(questions.main, function(err, config) {
@@ -148,11 +155,11 @@ function setupConfig(next) {
 		var	config = {},
 			redisQuestions = require('./database/redis').questions,
 			mongoQuestions = require('./database/mongo').questions,
-			question, x, numQ, allQuestions = questions.main.concat(redisQuestions).concat(mongoQuestions);
+			question, x, numQ, allQuestions = questions.main.concat(questions.optional).concat(redisQuestions).concat(mongoQuestions);
 
 		for(x=0,numQ=allQuestions.length;x<numQ;x++) {
 			question = allQuestions[x];
-			config[question.name] = install.values[question.name] || question['default'] || '';
+			config[question.name] = install.values[question.name] || question['default'] || undefined;
 		}
 
 		configureDatabases(null, config, DATABASES, function(err, config) {
@@ -378,17 +385,34 @@ function createCategories(next) {
 	});
 }
 
+function createMenuItems(next) {
+	var navigation = require('./navigation/admin'),
+		data = require('../install/data/navigation.json');
+
+	navigation.save(data, next);
+}
+
 function createWelcomePost(next) {
 	var db = require('./database'),
 		Topics = require('./topics');
 
-	db.sortedSetCard('topics:tid', function(err, numTopics) {
-		if (numTopics === 0) {
+	async.parallel([
+		function(next) {
+			fs.readFile(path.join(__dirname, '../', 'install/data/welcome.md'), next);
+		},
+		function(next) {
+			db.getObjectField('global', 'topicCount', next);
+		}
+	], function(err, results) {
+		var content = results[0],
+			numTopics = results[1];
+
+		if (!parseInt(numTopics, 10)) {
 			Topics.post({
 				uid: 1,
 				cid: 2,
 				title: 'Welcome to your NodeBB!',
-				content: '# Welcome to your brand new NodeBB forum!\n\nThis is what a topic and post looks like. As an administator, you can edit the post\'s title and content.\n\nTo customise your forum, go to the [Administrator Control Panel](../../admin). You can modify all aspects of your forum there, including installation of third-party plugins.\n\n## Additional Resources\n\n* [NodeBB Documentation](https://docs.nodebb.org)\n* [Community Support Forum](https://community.nodebb.org)\n* [Project repository](https://github.com/nodebb/nodebb)'
+				content: content.toString()
 			}, next);
 		} else {
 			next();
@@ -405,20 +429,36 @@ function enableDefaultPlugins(next) {
 		'nodebb-plugin-markdown',
 		'nodebb-plugin-mentions',
 		'nodebb-widget-essentials',
+		'nodebb-rewards-essentials',
 		'nodebb-plugin-soundpack-default'
 	];
 	var	db = require('./database');
-	db.setAdd('plugins:active', defaultEnabled, next);
+	var order = defaultEnabled.map(function(plugin, index) {
+		return index;
+	});
+	db.sortedSetAdd('plugins:active', order, defaultEnabled, next);
 }
 
 function setCopyrightWidget(next) {
 	var	db = require('./database');
-
-	db.init(function(err) {
-		if (!err) {
-			db.setObjectField('widgets:global', 'footer', "[{\"widget\":\"html\",\"data\":{\"html\":\"<footer id=\\\"footer\\\" class=\\\"container footer\\\">\\r\\n\\t<div class=\\\"copyright\\\">\\r\\n\\t\\tCopyright © 2014 <a target=\\\"_blank\\\" href=\\\"https://nodebb.org\\\">NodeBB Forums</a> | <a target=\\\"_blank\\\" href=\\\"//github.com/NodeBB/NodeBB/graphs/contributors\\\">Contributors</a>\\r\\n\\t</div>\\r\\n</footer>\",\"title\":\"\",\"container\":\"\"}}]", next);
+	async.parallel({
+		footerJSON: function(next) {
+			fs.readFile(path.join(__dirname, '../', 'install/data/footer.json'), next);
+		},
+		footer: function(next) {
+			db.getObjectField('widgets:global', 'footer', next);
 		}
-	});
+	}, function(err, results) {
+		if (err) {
+			return next(err);
+		}
+		
+		if (!results.footer && results.footerJSON) {
+			db.setObjectField('widgets:global', 'footer', results.footerJSON.toString(), next);	
+		} else {
+			next();
+		}
+	});	
 }
 
 install.setup = function (callback) {
@@ -430,6 +470,7 @@ install.setup = function (callback) {
 		enableDefaultTheme,
 		createAdministrator,
 		createCategories,
+		createMenuItems,
 		createWelcomePost,
 		enableDefaultPlugins,
 		setCopyrightWidget,

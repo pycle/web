@@ -2,7 +2,6 @@
 
 var	async = require('async'),
 	winston = require('winston'),
-	cluster = require('cluster'),
 	fs = require('fs'),
 	path = require('path'),
 
@@ -26,6 +25,8 @@ var	async = require('async'),
 		categories: require('./admin/categories'),
 		groups: require('./admin/groups'),
 		tags: require('./admin/tags'),
+		rewards: require('./admin/rewards'),
+		navigation: require('./admin/navigation'),
 		themes: {},
 		plugins: {},
 		widgets: {},
@@ -50,8 +51,12 @@ SocketAdmin.before = function(socket, method, next) {
 };
 
 SocketAdmin.reload = function(socket, data, callback) {
-	events.logWithUser(socket.uid, ' is reloading NodeBB');
-	if (cluster.isWorker) {
+	events.log({
+		type: 'reload',
+		uid: socket.uid,
+		ip: socket.ip
+	});
+	if (process.send) {
 		process.send({
 			action: 'reload'
 		});
@@ -61,7 +66,11 @@ SocketAdmin.reload = function(socket, data, callback) {
 };
 
 SocketAdmin.restart = function(socket, data, callback) {
-	events.logWithUser(socket.uid, ' is restarting NodeBB');
+	events.log({
+		type: 'restart',
+		uid: socket.uid,
+		ip: socket.ip
+	});
 	meta.restart();
 };
 
@@ -95,11 +104,27 @@ SocketAdmin.themes.updateBranding = function(socket, data, callback) {
 };
 
 SocketAdmin.plugins.toggleActive = function(socket, plugin_id, callback) {
+	require('../postTools').resetCache();
 	plugins.toggleActive(plugin_id, callback);
 };
 
 SocketAdmin.plugins.toggleInstall = function(socket, data, callback) {
+	require('../postTools').resetCache();
 	plugins.toggleInstall(data.id, data.version, callback);
+};
+
+SocketAdmin.plugins.getActive = function(socket, data, callback) {
+	plugins.getActive(callback);
+};
+
+SocketAdmin.plugins.orderActivePlugins = function(socket, data, callback) {
+	async.each(data, function(plugin, next) {
+		if (plugin && plugin.name) {
+			db.sortedSetAdd('plugins:active', plugin.order || 0, plugin.name, next);
+		} else {
+			next();
+		}
+	}, callback);
 };
 
 SocketAdmin.plugins.upgrade = function(socket, data, callback) {
@@ -176,6 +201,11 @@ SocketAdmin.settings.set = function(socket, data, callback) {
 	meta.settings.set(data.hash, data.values, callback);
 };
 
+SocketAdmin.settings.clearSitemapCache = function(socket, data, callback) {
+	require('../sitemap').clearCache();
+	callback();
+};
+
 SocketAdmin.email.test = function(socket, data, callback) {
 	if (plugins.hasListeners('action:email.send')) {
 		emailer.send('test', socket.uid, {
@@ -190,7 +220,7 @@ SocketAdmin.email.test = function(socket, data, callback) {
 
 SocketAdmin.analytics.get = function(socket, data, callback) {
 	data.units = 'hours'; // temp
-	data.amount = 12;
+	data.amount = 24;
 
 	if (data && data.graph && data.units && data.amount) {
 		if (data.graph === 'traffic') {
@@ -200,6 +230,9 @@ SocketAdmin.analytics.get = function(socket, data, callback) {
 				},
 				pageviews: function(next) {
 					getHourlyStatsForSet('analytics:pageviews', data.amount, next);
+				},
+				monthlyPageViews: function(next) {
+					getMonthlyPageViews(next);
 				}
 			}, callback);
 		}
@@ -228,20 +261,15 @@ function getHourlyStatsForSet(set, hours, callback) {
 		hour.setHours(hour.getHours() - 1, 0, 0, 0);
 	}
 
-	async.each(hoursArr, function(term, next) {
-		if (set.indexOf('analytics') !== -1) {
-			db.sortedSetScore(set, term, function(err, count) {
-				terms[term] = count || 0;
-				next(err);
-			});
-		} else {
-			db.sortedSetCount(set, term, Date.now(), function(err, count) {
-				terms[term] = count || 0;
-				next(err);
-			});
+	db.sortedSetScores(set, hoursArr, function(err, counts) {
+		if (err) {
+			return callback(err);
 		}
 
-	}, function(err) {
+		hoursArr.forEach(function(term, index) {
+			terms[term] = counts[index] || 0;
+		});
+
 		var termsArr = [];
 
 		hoursArr.reverse();
@@ -249,17 +277,45 @@ function getHourlyStatsForSet(set, hours, callback) {
 			termsArr.push(terms[hour]);
 		});
 
-		callback(err, termsArr);
+		callback(null, termsArr);
+	});
+}
+
+function getMonthlyPageViews(callback) {
+	var thisMonth = new Date();
+	var lastMonth = new Date();
+	thisMonth.setMonth(thisMonth.getMonth(), 1);
+	thisMonth.setHours(0, 0, 0, 0);
+	lastMonth.setMonth(thisMonth.getMonth() - 1, 1);
+	lastMonth.setHours(0, 0, 0, 0);
+
+	var values = [thisMonth.getTime(), lastMonth.getTime()];
+
+	db.sortedSetScores('analytics:pageviews:month', values, function(err, scores) {
+		if (err) {
+			return callback(err);
+		}
+		callback(null, {thisMonth: scores[0] || 0, lastMonth: scores[1] || 0});
 	});
 }
 
 SocketAdmin.getMoreEvents = function(socket, next, callback) {
-	if (parseInt(next, 10) < 0) {
+	var start = parseInt(next, 10);
+	if (start < 0) {
 		return callback(null, {data: [], next: next});
 	}
-	events.getLog(next, 5000, callback);
+	var end = next + 10;
+	events.getEvents(start, end, function(err, events) {
+		if (err) {
+			return callback(err);
+		}
+		callback(null, {events: events, next: end + 1});
+	});
 };
 
+SocketAdmin.deleteAllEvents = function(socket, data, callback) {
+	events.deleteAll(callback);
+};
 
 SocketAdmin.dismissFlag = function(socket, pid, callback) {
 	if (!pid) {
@@ -273,43 +329,24 @@ SocketAdmin.dismissAllFlags = function(socket, data, callback) {
 	posts.dismissAllFlags(callback);
 };
 
-SocketAdmin.getMoreFlags = function(socket, after, callback) {
-	if (!parseInt(after, 10)) {
+SocketAdmin.getMoreFlags = function(socket, data, callback) {
+	if (!data || !parseInt(data.after, 10)) {
 		return callback('[[error:invalid-data]]');
 	}
-	after = parseInt(after, 10);
-	posts.getFlags(socket.uid, after, after + 19, function(err, posts) {
-		callback(err, {posts: posts, next: after + 20});
-	});
-};
-
-SocketAdmin.getVoters = function(socket, pid, callback) {
-	async.parallel({
-		upvoteUids: function(next) {
-			db.getSetMembers('pid:' + pid + ':upvote', next);
-		},
-		downvoteUids: function(next) {
-			db.getSetMembers('pid:' + pid + ':downvote', next);
-		}
-	}, function(err, results) {
-		if (err) {
-			return callback(err);
-		}
-		async.parallel({
-			upvoters: function(next) {
-				user.getMultipleUserFields(results.upvoteUids, ['username', 'userslug', 'picture'], next);
-			},
-			upvoteCount: function(next) {
-				next(null, results.upvoteUids.length);
-			},
-			downvoters: function(next) {
-				user.getMultipleUserFields(results.downvoteUids, ['username', 'userslug', 'picture'], next);
-			},
-			downvoteCount: function(next) {
-				next(null, results.downvoteUids.length);
-			}
-		}, callback);
-	});
+	var sortBy = data.sortBy || 'count';
+	var byUsername = data.byUsername ||  '';
+	var start = parseInt(data.after, 10);
+	var end = start + 19;
+	if (byUsername) {
+		posts.getUserFlags(byUsername, sortBy, socket.uid, start, end, function(err, posts) {
+			callback(err, {posts: posts, next: end + 1});
+		});
+	} else {
+		var set = sortBy === 'count' ? 'posts:flags:count' : 'posts:flagged';
+		posts.getFlags(set, socket.uid, start, end, function(err, posts) {
+			callback(err, {posts: posts, next: end + 1});
+		});
+	}
 };
 
 SocketAdmin.takeHeapSnapshot = function(socket, data, callback) {

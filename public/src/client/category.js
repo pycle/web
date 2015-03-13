@@ -1,13 +1,27 @@
 "use strict";
 /* global define, config, templates, app, utils, ajaxify, socket, translator */
 
-define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll', 'share', 'paginator', 'forum/categoryTools'], function(composer, pagination, infinitescroll, share, paginator, categoryTools) {
+define('forum/category', [
+	'composer',
+	'forum/pagination',
+	'forum/infinitescroll',
+	'share',
+	'paginator',
+	'forum/categoryTools',
+	'sort'
+], function(composer, pagination, infinitescroll, share, paginator, categoryTools, sort) {
 	var Category = {};
 
 	$(window).on('action:ajaxify.start', function(ev, data) {
 		if(data && data.url.indexOf('category') !== 0) {
 			removeListeners();
 		}
+	});
+
+	$(window).on('action:composer.topics.post', function(ev, data) {
+		localStorage.removeItem('category:' + data.data.cid + ':bookmark');
+		localStorage.removeItem('category:' + data.data.cid + ':bookmark:clicked');
+		ajaxify.go('topic/' + data.data.slug);
 	});
 
 	function removeListeners() {
@@ -31,14 +45,16 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 
 		categoryTools.init(cid);
 
+		sort.handleSort('categoryTopicSort', 'user.setCategorySort', 'category/' + ajaxify.variables.get('category_slug'));
+
 		enableInfiniteLoadingOrPagination();
 
 		$('#topics-container').on('click', '.topic-title', function() {
-			var clickedTid = $(this).parents('li.category-item[data-tid]').attr('data-tid');
+			var clickedIndex = $(this).parents('[data-index]').attr('data-index');
 			$('#topics-container li.category-item').each(function(index, el) {
-				if($(el).offset().top - $(window).scrollTop() > 0) {
-					localStorage.setItem('category:' + cid + ':bookmark', $(el).attr('data-tid'));
-					localStorage.setItem('category:' + cid + ':bookmark:clicked', clickedTid);
+				if ($(el).offset().top - $(window).scrollTop() > 0) {
+					localStorage.setItem('category:' + cid + ':bookmark', $(el).attr('data-index'));
+					localStorage.setItem('category:' + cid + ':bookmark:clicked', clickedIndex);
 					return false;
 				}
 			});
@@ -68,8 +84,8 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 	};
 
 	Category.toBottom = function() {
-		socket.emit('categories.getTopicCount', ajaxify.variables.get('category_id'), function(err, index) {
-			paginator.scrollBottom(index);
+		socket.emit('categories.getTopicCount', ajaxify.variables.get('category_id'), function(err, count) {
+			navigator.scrollBottom(count - 1);
 		});
 	};
 
@@ -78,7 +94,7 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 	};
 
 	$(window).on('action:popstate', function(ev, data) {
-		if(data.url.indexOf('category/') === 0) {
+		if (data.url.indexOf('category/') === 0) {
 			var cid = data.url.match(/^category\/(\d+)/);
 			if (cid && cid[1]) {
 				cid = cid[1];
@@ -87,52 +103,44 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 				return;
 			}
 
-			var bookmark = localStorage.getItem('category:' + cid + ':bookmark');
-			var clicked = localStorage.getItem('category:' + cid + ':bookmark:clicked');
+			var bookmarkIndex = localStorage.getItem('category:' + cid + ':bookmark');
+			var clickedIndex = localStorage.getItem('category:' + cid + ':bookmark:clicked');
 
-			if (!bookmark) {
+			if (!bookmarkIndex) {
 				return;
 			}
 
-			if(config.usePagination) {
-				socket.emit('topics.getTidPage', bookmark, function(err, page) {
-					if (err) {
-						return;
-					}
-					if(parseInt(page, 10) !== pagination.currentPage) {
-						pagination.loadPage(page);
-					} else {
-						Category.scrollToTopic(bookmark, clicked, 400);
-					}
-				});
-			} else {
-				socket.emit('topics.getTidIndex', bookmark, function(err, index) {
-					if (err) {
-						return;
-					}
-
-					if (index === 0) {
-						Category.highlightTopic(clicked);
-						return;
-					}
-
-					if (index < 0) {
-						index = 0;
-					}
-
-					$('#topics-container').empty();
-
-					loadTopicsAfter(index, function() {
-						Category.scrollToTopic(bookmark, clicked, 0);
+			if (config.usePagination) {
+				var page = Math.ceil((parseInt(bookmarkIndex, 10) + 1) / config.topicsPerPage);
+				if (parseInt(page, 10) !== pagination.currentPage) {
+					pagination.loadPage(page, function() {
+						Category.scrollToTopic(bookmarkIndex, clickedIndex, 400);
 					});
+				} else {
+					Category.scrollToTopic(bookmarkIndex, clickedIndex, 400);
+				}
+			} else {
+				if (bookmarkIndex === 0) {
+					Category.highlightTopic(clickedIndex);
+					return;
+				}
+
+				if (bookmarkIndex < 0) {
+					bookmarkIndex = 0;
+				}
+
+				$('#topics-container').empty();
+
+				loadTopicsAfter(bookmarkIndex, function() {
+					Category.scrollToTopic(bookmarkIndex, clickedIndex, 0);
 				});
 			}
 		}
 	});
 
-	Category.highlightTopic = function(tid) {
-		var highlight = $('#topics-container li.category-item[data-tid="' + tid + '"]');
-		if(highlight.length && !highlight.hasClass('highlight')) {
+	Category.highlightTopic = function(topicIndex) {
+		var highlight = $('#topics-container [data-index="' + topicIndex + '"]');
+		if (highlight.length && !highlight.hasClass('highlight')) {
 			highlight.addClass('highlight');
 			setTimeout(function() {
 				highlight.removeClass('highlight');
@@ -140,27 +148,24 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 		}
 	};
 
-	Category.scrollToTopic = function(tid, clickedTid, duration, offset) {
-		if(!tid) {
+	Category.scrollToTopic = function(bookmarkIndex, clickedIndex, duration, offset) {
+		if (!bookmarkIndex) {
 			return;
 		}
 
-		if(!offset) {
+		if (!offset) {
 			offset = 0;
 		}
 
-		if($('#topics-container li.category-item[data-tid="' + tid + '"]').length) {
-			var	cid = ajaxify.variables.get('category_id');
-			var scrollTo = $('#topics-container li.category-item[data-tid="' + tid + '"]');
-
-			if (cid && scrollTo.length) {
-				$('html, body').animate({
-					scrollTop: (scrollTo.offset().top - $('#header-menu').height() - offset) + 'px'
-				}, duration !== undefined ? duration : 400, function() {
-					Category.highlightTopic(clickedTid);
-					paginator.update();
-				});
-			}
+		var scrollTo = $('#topics-container [data-index="' + bookmarkIndex + '"]');
+		var	cid = ajaxify.variables.get('category_id');
+		if (scrollTo.length && cid) {
+			$('html, body').animate({
+				scrollTop: (scrollTo.offset().top - $('#header-menu').height() - offset) + 'px'
+			}, duration !== undefined ? duration : 400, function() {
+				Category.highlightTopic(clickedIndex);
+				paginator.update();
+			});
 		}
 	};
 
@@ -175,7 +180,7 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 
 	Category.onNewTopic = function(topic) {
 		var	cid = ajaxify.variables.get('category_id');
-		if(!topic || parseInt(topic.cid, 10) !== parseInt(cid, 10)) {
+		if (!topic || parseInt(topic.cid, 10) !== parseInt(cid, 10)) {
 			return;
 		}
 
@@ -216,10 +221,6 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 				}
 
 				topic.hide().fadeIn('slow');
-
-				socket.emit('categories.getPageCount', ajaxify.variables.get('category_id'), function(err, newPageCount) {
-					pagination.recreatePaginationLinks(newPageCount);
-				});
 
 				topic.find('span.timeago').timeago();
 				app.createUserTooltips();
@@ -309,12 +310,14 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 			return;
 		}
 
-		loadTopicsAfter(after, direction, function() {
-			// I'm not sure what this does, ask baris - andrew
-			// seems like direction isn't even being used in loadTopicsAfter, so I guess this is where it was being used?
-			/*if (direction < 0 && el) {
-				Category.scrollToTopic(el.attr('data-tid'), null, 0, offset);
-			}*/
+		infinitescroll.calculateAfter(direction, '#topics-container .category-item[data-tid]', config.topicsPerPage, false, function(after, offset, el) {
+			loadTopicsAfter(after, function() {
+				// I'm not sure what this does, ask baris - andrew
+				// seems like direction isn't even being used in loadTopicsAfter, so I guess this is where it was being used?
+				/*if (direction < 0 && el) {
+					Category.scrollToTopic(el.attr('data-tid'), null, 0, offset);
+				}*/
+			});
 		});
 	};
 
@@ -327,7 +330,7 @@ define('forum/category', ['composer', 'forum/pagination', 'forum/infinitescroll'
 		infinitescroll.loadMore('categories.loadMore', {
 			cid: ajaxify.variables.get('category_id'),
 			after: after,
-			author: utils.getQueryParams().author
+			author: utils.params().author
 		}, function (data, done) {
 
 			if (data.topics && data.topics.length) {

@@ -2,9 +2,7 @@
 
 var	SocketIO = require('socket.io'),
 	socketioWildcard = require('socketio-wildcard')(),
-	util = require('util'),
 	async = require('async'),
-	path = require('path'),
 	fs = require('fs'),
 	nconf = require('nconf'),
 	cookieParser = require('cookie-parser')(nconf.get('secret')),
@@ -12,7 +10,6 @@ var	SocketIO = require('socket.io'),
 
 	db = require('../database'),
 	user = require('../user'),
-	topics = require('../topics'),
 	logger = require('../logger'),
 	ratelimit = require('../middleware/ratelimit'),
 
@@ -36,21 +33,27 @@ Sockets.init = function(server) {
 	io.on('connection', onConnection);
 
 	io.listen(server, {
-		transports: ['websocket', 'polling']
+		transports: nconf.get('socket.io:transports')
 	});
 
 	Sockets.server = io;
 };
 
 function onConnection(socket) {
-	socket.ip = socket.request.connection.remoteAddress;
+	socket.ip = socket.request.headers['x-forwarded-for'] || socket.request.connection.remoteAddress;
 
 	logger.io_one(socket, socket.uid);
 
 	onConnect(socket);
 
-	socket.on('disconnect', function() {
-		onDisconnect(socket);
+	// see https://github.com/Automattic/socket.io/issues/1814 and
+	// http://stackoverflow.com/questions/25830415/get-the-list-of-rooms-the-client-is-currently-in-on-disconnect-event
+	socket.onclose = function(reason) {
+		Object.getPrototypeOf(this).onclose.call(this, {reason: reason, rooms: socket.rooms.slice()});
+	};
+
+	socket.on('disconnect', function(data) {
+		onDisconnect(socket, data);
 	});
 
 	socket.on('*', function(payload) {
@@ -63,47 +66,35 @@ function onConnect(socket) {
 		socket.join('uid_' + socket.uid);
 		socket.join('online_users');
 
-		async.parallel({
-			user: function(next) {
-				user.getUserFields(socket.uid, ['username', 'userslug', 'picture', 'status'], next);
-			},
-			isAdmin: function(next) {
-				user.isAdministrator(socket.uid, next);
-			}
-		}, function(err, userData) {
-			if (err || !userData.user) {
+		user.getUserFields(socket.uid, ['status'], function(err, userData) {
+			if (err || !userData) {
 				return;
 			}
-			socket.emit('event:connect', {
-				username: userData.user.username,
-				userslug: userData.user.userslug,
-				picture: userData.user.picture,
-				isAdmin: userData.isAdmin,
-				uid: socket.uid
-			});
 
-			socket.broadcast.emit('event:user_status_change', {uid: socket.uid, status: userData.user.status});
+			socket.emit('event:connect');
+			if (userData.status !== 'offline') {
+				socket.broadcast.emit('event:user_status_change', {uid: socket.uid, status: userData.status || 'online'});
+			}
 		});
 	} else {
 		socket.join('online_guests');
-		socket.emit('event:connect', {
-			username: '[[global:guest]]',
-			isAdmin: false,
-			uid: 0
-		});
+		socket.emit('event:connect');
 	}
 }
 
-function onDisconnect(socket) {
+function onDisconnect(socket, data) {
 	if (socket.uid) {
 		var socketCount = Sockets.getUserSocketCount(socket.uid);
 		if (socketCount <= 0) {
 			socket.broadcast.emit('event:user_status_change', {uid: socket.uid, status: 'offline'});
 		}
 
-		// TODO: if we can get socket.rooms here this can be made more efficient,
-		// see https://github.com/Automattic/socket.io/issues/1897
-		io.sockets.in('online_users').emit('event:user_leave', socket.uid);
+		// see https://github.com/Automattic/socket.io/issues/1814
+		data.rooms.forEach(function(roomName) {
+			if (roomName.startsWith('topic')) {
+				io.sockets.in(roomName).emit('event:user_leave', socket.uid);
+			}
+		});
 	}
 }
 
@@ -118,11 +109,6 @@ function onMessage(socket, payload) {
 
 	if (!eventName) {
 		return winston.warn('[socket.io] Empty method name');
-	}
-
-	if (ratelimit.isFlooding(socket)) {
-		winston.warn('[socket.io] Too many emits! Disconnecting uid : ' + socket.uid + '. Message : ' + payload.name);
-		return socket.disconnect();
 	}
 
 	var parts = eventName.toString().split('.'),
@@ -140,6 +126,17 @@ function onMessage(socket, payload) {
 			winston.warn('[socket.io] Unrecognized message: ' + eventName);
 		}
 		return;
+	}
+
+	socket.previousEvents = socket.previousEvents || [];
+	socket.previousEvents.push(eventName);
+	if (socket.previousEvents.length > 20) {
+		socket.previousEvents.shift();
+	}
+
+	if (!eventName.startsWith('admin.') && ratelimit.isFlooding(socket)) {
+		winston.warn('[socket.io] Too many emits! Disconnecting uid : ' + socket.uid + '. Events : ' + socket.previousEvents);
+		return socket.disconnect();
 	}
 
 	if (Namespaces[namespace].before) {
@@ -166,34 +163,31 @@ function requireModules() {
 	});
 }
 
-function authorize(socket, next) {
-	var handshake = socket.request,
-		sessionID;
+function authorize(socket, callback) {
+	var handshake = socket.request;
 
 	if (!handshake) {
-		return next(new Error('[[error:not-authorized]]'));
+		return callback(new Error('[[error:not-authorized]]'));
 	}
 
-	cookieParser(handshake, {}, function(err) {
-		if (err) {
-			return next(err);
+	async.waterfall([
+		function(next) {
+			cookieParser(handshake, {}, next);
+		},
+		function(next) {
+			db.sessionStore.get(handshake.signedCookies['express.sid'], function(err, sessionData) {
+				if (err) {
+					return next(err);
+				}
+				if (sessionData && sessionData.passport && sessionData.passport.user) {
+					socket.uid = parseInt(sessionData.passport.user, 10);
+				} else {
+					socket.uid = 0;
+				}	
+				next();
+			});
 		}
-
-		var sessionID = handshake.signedCookies['express.sid'];
-
-		db.sessionStore.get(sessionID, function(err, sessionData) {
-			if (err) {
-				return next(err);
-			}
-
-			if (sessionData && sessionData.passport && sessionData.passport.user) {
-				socket.uid = parseInt(sessionData.passport.user, 10);
-			} else {
-				socket.uid = 0;
-			}
-			next();
-		});
-	});
+	], callback);
 }
 
 function addRedisAdapter(io) {
@@ -204,13 +198,13 @@ function addRedisAdapter(io) {
 		var sub = redis.connect({return_buffers: true});
 
 		io.adapter(redisAdapter({pubClient: pub, subClient: sub}));
-	} else {
+	} else if (nconf.get('isCluster') === 'true') {
 		winston.warn('[socket.io] Clustering detected, you are advised to configure Redis as a websocket store.');
 	}
 }
 
 function callMethod(method, socket, params, callback) {
-	method.call(null, socket, params, function(err, result) {
+	method(socket, params, function(err, result) {
 		callback(err ? {message: err.message} : null, result);
 	});
 }
@@ -253,7 +247,7 @@ Sockets.reqFromSocket = function(socket) {
 		referer = headers.referer || '';
 
 	return {
-		ip: socket.ip,
+		ip: headers['x-forwarded-for'] || socket.ip,
 		host: host,
 		protocol: socket.request.connection.encrypted ? 'https' : 'http',
 		secure: !!socket.request.connection.encrypted,
@@ -273,7 +267,7 @@ Sockets.isUsersOnline = function(uids, callback) {
 	callback(null, uids.map(Sockets.isUserOnline));
 };
 
-Sockets.updateRoomBrowsingText = function (roomName, selfUid) {
+Sockets.getUsersInRoom = function (uid, roomName, callback) {
 	if (!roomName) {
 		return;
 	}
@@ -281,22 +275,23 @@ Sockets.updateRoomBrowsingText = function (roomName, selfUid) {
 	var	uids = Sockets.getUidsInRoom(roomName);
 	var total = uids.length;
 	uids = uids.slice(0, 9);
-	if (selfUid) {
-		uids = [selfUid].concat(uids);
+	if (uid && uids.indexOf(uid.toString()) === -1) {
+		uids = [uid].concat(uids);
 	}
+
 	if (!uids.length) {
-		return;
+		return callback(null, {users: [], total: 0 , room: roomName});
 	}
 	user.getMultipleUserFields(uids, ['uid', 'username', 'userslug', 'picture', 'status'], function(err, users) {
 		if (err) {
-			return;
+			return callback(err);
 		}
 
 		users = users.filter(function(user) {
 			return user && user.status !== 'offline';
 		});
 
-		io.sockets.in(roomName).emit('event:update_users_in_room', {
+		callback(null, {
 			users: users,
 			room: roomName,
 			total: Math.max(0, total - uids.length)
@@ -304,13 +299,15 @@ Sockets.updateRoomBrowsingText = function (roomName, selfUid) {
 	});
 };
 
-Sockets.getUidsInRoom = function(roomName) {
+Sockets.getUidsInRoom = function(roomName, callback) {
+	callback = callback || function() {};
 	// TODO : doesnt work in cluster
 
 	var uids = [];
 
 	var socketids = Object.keys(io.sockets.adapter.rooms[roomName] || {});
 	if (!Array.isArray(socketids) || !socketids.length) {
+		callback(null, []);
 		return [];
 	}
 
@@ -324,7 +321,7 @@ Sockets.getUidsInRoom = function(roomName) {
 			});
 		}
 	}
-
+	callback(null, uids);
 	return uids;
 };
 

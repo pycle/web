@@ -8,7 +8,11 @@ var async = require('async'),
 module.exports = function(User) {
 
 	User.logIP = function(uid, ip) {
-		db.sortedSetAdd('uid:' + uid + ':ip', Date.now(), ip || 'Unknown');
+		var now = Date.now();
+		db.sortedSetAdd('uid:' + uid + ':ip', now, ip || 'Unknown');
+		if (ip) {
+			db.sortedSetAdd('ip:' + ip + ':uid', now, uid);
+		}
 	};
 
 	User.getIPs = function(uid, end, callback) {
@@ -48,7 +52,7 @@ module.exports = function(User) {
 	User.ban = function(uid, callback) {
 		User.setUserField(uid, 'banned', 1, function(err) {
 			if (err) {
-				return callback();
+				return callback(err);
 			}
 			db.sortedSetAdd('users:banned', Date.now(), uid, callback);
 		});
@@ -62,5 +66,15 @@ module.exports = function(User) {
 			}
 			db.sortedSetRemove('users:banned', uid, callback);
 		});
+	};
+
+	User.resetFlags = function(uids, callback) {
+		if (!Array.isArray(uids) || !uids.length) {
+			return callback();
+		}
+		var keys = uids.map(function(uid) {
+			return 'uid:' + uid + ':flagged_by';
+		});
+		db.deleteAll(keys, callback);
 	};
 };

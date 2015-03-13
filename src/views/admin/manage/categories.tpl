@@ -48,6 +48,7 @@
 																<!-- ENDIF categories.disabled -->
 															</li>
 															<li><a href="#" class="purge"><i class="fa fa-eraser"></i> Purge</a></li>
+															<li><a href="#" class="duplicate"><i class="fa fa-copy"></i> Duplicate</a></li>
 														</ul>
 
 
@@ -132,7 +133,7 @@
 		</div>
 	</div>
 
-	<div class="col-lg-3">
+	<div class="col-lg-3  acp-sidebar">
 		<div class="panel panel-default">
 			<div class="panel-heading">Categories Control Panel</div>
 			<div class="panel-body">
@@ -149,7 +150,7 @@
 		<div class="icon-container">
 			<div class="row fa-icons">
 				<i class="fa fa-doesnt-exist"></i>
-				<!-- IMPORT admin/partials/fontawesome.tpl -->
+				<!-- IMPORT partials/fontawesome.tpl -->
 			</div>
 		</div>
 	</div>

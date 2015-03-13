@@ -1,5 +1,5 @@
 "use strict";
-/* global socket, define, templates, bootbox, app, ajaxify,  */
+/* global config, socket, define, templates, bootbox, app, ajaxify,  */
 define('admin/manage/users', ['admin/modules/selectable'], function(selectable) {
 	var Users = {};
 
@@ -28,7 +28,7 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 		}
 
 		function removeSelected() {
-			$('#users-container .users-box .selected').remove();
+			$('#users-container .users-box .selected').parents('.users-box').remove();
 		}
 
 		function done(successMessage, className, flag) {
@@ -78,6 +78,16 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 			return false;
 		});
 
+		$('.reset-flags').on('click', function() {
+			var uids = getSelectedUids();
+			if (!uids.length) {
+				return;
+			}
+
+			socket.emit('admin.user.resetFlags', uids, done('Flags(s) reset!'));
+			return false;
+		});
+
 		$('.admin-user').on('click', function() {
 			var uids = getSelectedUids();
 			if (!uids.length) {
@@ -122,6 +132,19 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 				}
 			});
 			return false;
+		});
+
+		$('.send-validation-email').on('click', function() {
+			var uids = getSelectedUids();
+			if (!uids.length) {
+				return;
+			}
+			socket.emit('admin.user.sendValidationEmail', uids, function(err) {
+				if (err) {
+					return app.alertError(err.message);
+				}
+				app.alertSuccess('[[notifications:email-confirm-sent]]');
+			});
 		});
 
 		$('.password-reset-email').on('click', function() {
@@ -191,7 +214,7 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 					}
 					$('#create-modal').modal('hide');
 					$('#create-modal').on('hidden.bs.modal', function() {
-						ajaxify.go('admin/users');
+						ajaxify.refresh();
 					});
 					app.alertSuccess('User created!');
 				});
@@ -215,18 +238,19 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 			}
 		});
 
-		$('#search-user-name, #search-user-email').on('keyup', function() {
+		$('#search-user-name, #search-user-email, #search-user-ip').on('keyup', function() {
 			if (timeoutId !== 0) {
 				clearTimeout(timeoutId);
 				timeoutId = 0;
 			}
+
 			var $this = $(this);
-			var type =  $this.attr('id') === 'search-user-name' ? 'username' : 'email';
+			var type =  $this.attr('data-search-type');
 
 			timeoutId = setTimeout(function() {
 				$('.fa-spinner').removeClass('hidden');
 
-				socket.emit('admin.user.search', {type: type, query: $this.val()}, function(err, data) {
+				socket.emit('admin.user.search', {searchBy: [type], query: $this.val()}, function(err, data) {
 					if (err) {
 						return app.alertError(err.message);
 					}
@@ -256,14 +280,21 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 
 		handleUserCreate();
 
-		function onUsersLoaded(users) {
-			templates.parse('admin/manage/users', 'users', {users: users, requireEmailConfirmation: config.requireEmailConfirmation}, function(html) {
-				$('#users-container').append($(html));
-				selectable.enable('#users-container', '.user-selectable');
-			});
-		}
+		$('#load-more-users-btn').on('click', loadMoreUsers);
+
+		$(window).off('scroll').on('scroll', function() {
+			var bottom = ($(document).height() - $(window).height()) * 0.9;
+
+			if ($(window).scrollTop() > bottom && !loadingMoreUsers) {
+				loadMoreUsers();
+			}
+		});
+
 
 		function loadMoreUsers() {
+			if (active === 'search') {
+				return;
+			}
 			var set = 'users:joindate';
 			if (active === 'sort-posts') {
 				set = 'users:postcount';
@@ -272,7 +303,6 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 			} else if (active === 'banned') {
 				set = 'users:banned';
 			}
-
 
 			loadingMoreUsers = true;
 			socket.emit('user.loadMore', {
@@ -286,15 +316,12 @@ define('admin/manage/users', ['admin/modules/selectable'], function(selectable) 
 			});
 		}
 
-		$('#load-more-users-btn').on('click', loadMoreUsers);
-
-		$(window).off('scroll').on('scroll', function() {
-			var bottom = ($(document).height() - $(window).height()) * 0.9;
-
-			if ($(window).scrollTop() > bottom && !loadingMoreUsers) {
-				loadMoreUsers();
-			}
-		});
+		function onUsersLoaded(users) {
+			templates.parse('admin/manage/users', 'users', {users: users, requireEmailConfirmation: config.requireEmailConfirmation}, function(html) {
+				$('#users-container').append($(html));
+				selectable.enable('#users-container', '.user-selectable');
+			});
+		}
 
 
 	};

@@ -4,11 +4,12 @@
 	var passport = require('passport'),
 		passportLocal = require('passport-local').Strategy,
 		nconf = require('nconf'),
-		Password = require('../password'),
 		winston = require('winston'),
 		async = require('async'),
+		validator = require('validator'),
 		express = require('express'),
 
+		Password = require('../password'),
 		meta = require('../meta'),
 		user = require('../user'),
 		plugins = require('../plugins'),
@@ -36,6 +37,13 @@
 
 		plugins.ready(function() {
 			loginStrategies.length = 0;
+
+			if (plugins.hasListeners('action:auth.overrideLogin')) {
+				winston.warn('[authentication] Login override detected, skipping local login strategy.');
+				plugins.fireHook('action:auth.overrideLogin');
+			} else {
+				passport.use(new passportLocal({passReqToCallback: true}, Auth.login));
+			}
 
 			plugins.fireHook('filter:auth.init', loginStrategies, function(err) {
 				if (err) {
@@ -68,7 +76,7 @@
 		});
 	};
 
-	Auth.login = function(username, password, next) {
+	Auth.login = function(req, username, password, next) {
 		if (!username || !password) {
 			return next(new Error('[[error:invalid-password]]'));
 		}
@@ -85,7 +93,7 @@
 					return next(new Error('[[error:no-user]]'));
 				}
 				uid = _uid;
-				user.auth.logAttempt(uid, next);
+				user.auth.logAttempt(uid, req.ip, next);
 			},
 			function(next) {
 				db.getObjectFields('user:' + uid, ['password', 'banned'], next);
@@ -109,8 +117,6 @@
 		], next);
 	};
 
-	passport.use(new passportLocal(Auth.login));
-
 	passport.serializeUser(function(user, done) {
 		done(null, user.uid);
 	});
@@ -131,20 +137,28 @@
 			req.session.returnTo = req.body.returnTo;
 		}
 
-		if (req.body.username && utils.isEmailValid(req.body.username)) {
+		if (plugins.hasListeners('action:auth.overrideLogin')) {
+			return Auth.continueLogin(req, res, next);
+		};
+
+		var loginWith = meta.config.allowLoginWith || 'username-email';
+
+		if (req.body.username && utils.isEmailValid(req.body.username) && loginWith.indexOf('email') !== -1) {
 			user.getUsernameByEmail(req.body.username, function(err, username) {
 				if (err) {
 					return next(err);
 				}
 				req.body.username = username ? username : req.body.username;
-				continueLogin(req, res, next);
+				Auth.continueLogin(req, res, next);
 			});
+		} else if (loginWith.indexOf('username') !== -1 && !validator.isEmail(req.body.username)) {
+			Auth.continueLogin(req, res, next);
 		} else {
-			continueLogin(req, res, next);
+			res.status(500).send('[[error:wrong-login-type-' + loginWith + ']]');
 		}
 	}
 
-	function continueLogin(req, res, next) {
+	Auth.continueLogin = function(req, res, next) {
 		passport.authenticate('local', function(err, userData, info) {
 			if (err) {
 				return res.status(403).send(err.message);
@@ -183,14 +197,15 @@
 				if (!req.session.returnTo) {
 					res.status(200).send(nconf.get('relative_path') + '/');
 				} else {
+
 					var next = req.session.returnTo;
 					delete req.session.returnTo;
 
-					res.status(200).send(nconf.get('relative_path') + next);
+					res.status(200).send(next);
 				}
 			});
 		})(req, res, next);
-	}
+	};
 
 	function register(req, res) {
 		if (parseInt(meta.config.allowRegistration, 10) === 0) {
@@ -208,15 +223,22 @@
 		var uid;
 		async.waterfall([
 			function(next) {
+				if (!userData.email) {
+					return next(new Error('[[error:invalid-email]]'));
+				}
+
 				if (!userData.username || userData.username.length < meta.config.minimumUsernameLength) {
 					return next(new Error('[[error:username-too-short]]'));
 				}
-				next();
-			},
-			function(next) {
-				if (!userData.username || userData.username.length > meta.config.maximumUsernameLength) {
+
+				if (userData.username.length > meta.config.maximumUsernameLength) {
 					return next(new Error('[[error:username-too-long'));
 				}
+
+				if (!userData.password || userData.password.length < meta.config.minimumPasswordLength) {
+					return next(new Error('[[user:change_password_error_length]]'));
+				}
+
 				next();
 			},
 			function(next) {
@@ -241,19 +263,24 @@
 				return res.status(400).send(err.message);
 			}
 
-			res.status(200).send(data.referrer ? data.referrer : '/');
+			res.status(200).send(data.referrer ? data.referrer : nconf.get('relative_path') + '/');
 		});
 	}
 
-	function logout(req, res) {
+	function logout(req, res, next) {
 		if (req.user && parseInt(req.user.uid, 10) > 0 && req.sessionID) {
 
 			require('../socket.io').logoutUser(req.user.uid);
-			db.sessionStore.destroy(req.sessionID);
-			req.logout();
+			db.sessionStore.destroy(req.sessionID, function(err) {
+				if (err) {
+					return next(err);
+				}
+				req.logout();
+				res.status(200).send('');
+			});
+		} else {
+			res.status(200).send('');
 		}
-
-		res.status(200).send('');
 	}
 
 }(exports));

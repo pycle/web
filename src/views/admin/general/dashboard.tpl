@@ -1,5 +1,6 @@
 <div class="row dashboard">
-	<div class="col-lg-9">
+	<!-- Override for now, until the right sidebar graphs are fixed (pending socket.io resolution) -->
+	<div class="col-lg-12">
 		<div class="panel panel-default">
 			<div class="panel-heading">Forum Traffic</div>
 			<div class="panel-body">
@@ -9,6 +10,15 @@
 						<li><div class="unique-visitors"></div><span>Unique Visitors</span></li>
 					</ul>
 					<canvas id="analytics-traffic" width="100%" height="400"></canvas>
+				</div>
+				<hr/>
+				<div class="text-center pull-left monthly-pageviews">
+					<div><strong id="pageViewsLastMonth"></strong></div>
+					<div>Page views Last Month</div>
+				</div>
+				<div class="text-center pull-left monthly-pageviews">
+					<div><strong id="pageViewsThisMonth"></strong></div>
+					<div>Page views This Month</div>
 				</div>
 			</div>
 		</div>
@@ -78,7 +88,8 @@
 			</div>
 		</div>
 	</div>
-	<div class="col-lg-3">
+	<!-- Override for now, until the right sidebar graphs are fixed (pending socket.io resolution) -->
+	<div class="col-lg-3 hide">
 		<div class="panel panel-default">
 			<div class="panel-heading">Anonymous vs Registered Users</div>
 			<div class="panel-body">

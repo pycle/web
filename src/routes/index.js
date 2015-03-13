@@ -13,9 +13,10 @@ var nconf = require('nconf'),
 	adminRoutes = require('./admin'),
 	feedRoutes = require('./feeds'),
 	pluginRoutes = require('./plugins'),
-	authRoutes = require('./authentication');
+	authRoutes = require('./authentication'),
+	helpers = require('./helpers');
 
-
+var setupPageRoute = helpers.setupPageRoute;
 
 function mainRoutes(app, middleware, controllers) {
 	setupPageRoute(app, '/', middleware, [], controllers.home);
@@ -26,7 +27,7 @@ function mainRoutes(app, middleware, controllers) {
 	setupPageRoute(app, '/register', middleware, loginRegisterMiddleware, controllers.register);
 	setupPageRoute(app, '/confirm/:code', middleware, [], controllers.confirmEmail);
 	setupPageRoute(app, '/outgoing', middleware, [], controllers.outgoing);
-	setupPageRoute(app, '/search/:term?', middleware, [middleware.guestSearchingAllowed], controllers.search);
+	setupPageRoute(app, '/search/:term?', middleware, [middleware.guestSearchingAllowed], controllers.search.search);
 	setupPageRoute(app, '/reset/:code?', middleware, [], controllers.reset);
 	setupPageRoute(app, '/tos', middleware, [], controllers.termsOfUse);
 }
@@ -40,23 +41,24 @@ function staticRoutes(app, middleware, controllers) {
 function topicRoutes(app, middleware, controllers) {
 	app.get('/api/topic/teaser/:topic_id', controllers.topics.teaser);
 
-	setupPageRoute(app, '/topic/:topic_id/:slug/:post_index?', middleware, [middleware.buildBreadcrumbs], controllers.topics.get);
-	setupPageRoute(app, '/topic/:topic_id/:slug?', middleware, [middleware.buildBreadcrumbs, middleware.addSlug], controllers.topics.get);
+	setupPageRoute(app, '/topic/:topic_id/:slug/:post_index?', middleware, [], controllers.topics.get);
+	setupPageRoute(app, '/topic/:topic_id/:slug?', middleware, [middleware.addSlug], controllers.topics.get);
 }
 
 function tagRoutes(app, middleware, controllers) {
-	setupPageRoute(app, '/tags/:tag', middleware, [], controllers.tags.getTag);
-	setupPageRoute(app, '/tags', middleware, [], controllers.tags.getTags);
+	setupPageRoute(app, '/tags/:tag', middleware, [middleware.publicTagListing], controllers.tags.getTag);
+	setupPageRoute(app, '/tags', middleware, [middleware.publicTagListing], controllers.tags.getTags);
 }
 
 function categoryRoutes(app, middleware, controllers) {
+	setupPageRoute(app, '/categories', middleware, [], controllers.categories.list);
 	setupPageRoute(app, '/popular/:term?', middleware, [], controllers.categories.popular);
 	setupPageRoute(app, '/recent', middleware, [], controllers.categories.recent);
 	setupPageRoute(app, '/unread', middleware, [middleware.authenticate], controllers.categories.unread);
 	app.get('/api/unread/total', middleware.authenticate, controllers.categories.unreadTotal);
 
-	setupPageRoute(app, '/category/:category_id/:slug/:topic_index', middleware, [middleware.buildBreadcrumbs], controllers.categories.get);
-	setupPageRoute(app, '/category/:category_id/:slug?', middleware, [middleware.buildBreadcrumbs, middleware.addSlug], controllers.categories.get);
+	setupPageRoute(app, '/category/:category_id/:slug/:topic_index', middleware, [], controllers.categories.get);
+	setupPageRoute(app, '/category/:category_id/:slug?', middleware, [middleware.addSlug], controllers.categories.get);
 }
 
 function accountRoutes(app, middleware, controllers) {
@@ -68,8 +70,10 @@ function accountRoutes(app, middleware, controllers) {
 	setupPageRoute(app, '/user/:userslug/followers', middleware, middlewares, controllers.accounts.getFollowers);
 	setupPageRoute(app, '/user/:userslug/posts', middleware, middlewares, controllers.accounts.getPosts);
 	setupPageRoute(app, '/user/:userslug/topics', middleware, middlewares, controllers.accounts.getTopics);
+	setupPageRoute(app, '/user/:userslug/groups', middleware, middlewares, controllers.accounts.getGroups);
 
 	setupPageRoute(app, '/user/:userslug/favourites', middleware, accountMiddlewares, controllers.accounts.getFavourites);
+	setupPageRoute(app, '/user/:userslug/watched', middleware, accountMiddlewares, controllers.accounts.getWatchedTopics);
 	setupPageRoute(app, '/user/:userslug/edit', middleware, accountMiddlewares, controllers.accounts.accountEdit);
 	setupPageRoute(app, '/user/:userslug/settings', middleware, accountMiddlewares, controllers.accounts.accountSettings);
 
@@ -89,17 +93,11 @@ function userRoutes(app, middleware, controllers) {
  }
 
 function groupRoutes(app, middleware, controllers) {
-	var middlewares = [middleware.checkGlobalPrivacySettings];
+	var middlewares = [middleware.checkGlobalPrivacySettings, middleware.exposeGroupName];
 
 	setupPageRoute(app, '/groups', middleware, middlewares, controllers.groups.list);
-	setupPageRoute(app, '/groups/:name', middleware, middlewares, controllers.groups.details);
-}
-
-function setupPageRoute(router, name, middleware, middlewares, controller) {
-	middlewares = middlewares.concat([middleware.incrementPageViews, middleware.updateLastOnlineTime]);
-
-	router.get(name, middleware.buildHeader, middlewares, controller);
-	router.get('/api' + name, middlewares, controller);
+	setupPageRoute(app, '/groups/:slug', middleware, middlewares, controllers.groups.details);
+	setupPageRoute(app, '/groups/:slug/members', middleware, middlewares, controllers.groups.members);
 }
 
 module.exports = function(app, middleware) {
@@ -119,8 +117,8 @@ module.exports = function(app, middleware) {
 	app.use(middleware.maintenanceMode);
 
 	app.all(relativePath + '/api/?*', middleware.prepareAPI);
-	app.all(relativePath + '/api/admin/*', middleware.admin.isAdmin, middleware.prepareAPI);
-	app.all(relativePath + '/admin/?*', middleware.ensureLoggedIn, middleware.admin.isAdmin);
+	app.all(relativePath + '/api/admin/?*', middleware.isAdmin);
+	app.all(relativePath + '/admin/?*', middleware.ensureLoggedIn, middleware.applyCSRF, middleware.isAdmin);
 
 	adminRoutes(router, middleware, controllers);
 	metaRoutes(router, middleware, controllers);
@@ -142,8 +140,8 @@ module.exports = function(app, middleware) {
 	userRoutes(router, middleware, controllers);
 	groupRoutes(router, middleware, controllers);
 
-	app.use(relativePath, router);
 	app.use(relativePath, pluginRouter);
+	app.use(relativePath, router);
 	app.use(relativePath, authRouter);
 
 	if (process.env.NODE_ENV === 'development') {
@@ -166,59 +164,74 @@ module.exports = function(app, middleware) {
 		maxAge: app.enabled('cache') ? 5184000000 : 0
 	}));
 
-	app.use(catch404);
-	app.use(handleErrors);
+	handle404(app, middleware);
+	handleErrors(app, middleware);
+
 
 	// Add plugin routes
 	plugins.init(app, middleware);
 	authRoutes.reloadRoutes();
 };
 
-function handleErrors(err, req, res, next) {
-	// we may use properties of the error object
-	// here and next(err) appropriately, or if
-	// we possibly recovered from the error, simply next().
-	//console.error(err.stack, req.path);
-	winston.error(req.path + '\n', err.stack);
+function handle404(app, middleware) {
+	app.use(function(req, res, next) {
+		if (!plugins.hasListeners('action:meta.override404')) {
+			var relativePath = nconf.get('relative_path');
+			var	isLanguage = new RegExp('^' + relativePath + '/language/[\\w]{2,}/.*.json'),
+				isClientScript = new RegExp('^' + relativePath + '\\/src\\/.+\\.js');
 
-	if (err.code === 'EBADCSRFTOKEN') {
-		return res.sendStatus(403);
-	}
+			if (isClientScript.test(req.url)) {
+				res.type('text/javascript').status(200).send('');
+			} else if (isLanguage.test(req.url)) {
+				res.status(200).json({});
+			} else if (req.accepts('html')) {
+				if (process.env.NODE_ENV === 'development') {
+					winston.warn('Route requested but not found: ' + req.url);
+				}
 
-	var status = err.status || 500;
-	res.status(status);
+				res.status(404);
 
-	req.flash('errorMessage', err.message);
+				if (res.locals.isAPI) {
+					return res.json({path: req.path, error: 'not-found'});
+				}
 
-	res.redirect(nconf.get('relative_path') + '/500');
+				middleware.buildHeader(req, res, function() {
+					res.render('404', {path: req.path});
+				});
+			} else {
+				res.status(404).type('txt').send('Not found');
+			}
+		} else {
+			plugins.fireHook('action:meta.override404', {
+				req: req,
+				res: res,
+				error: {}
+			});
+		}
+	});
 }
 
-function catch404(req, res, next) {
-	var relativePath = nconf.get('relative_path');
-	var	isLanguage = new RegExp('^' + relativePath + '/language/[\\w]{2,}/.*.json'),
-		isClientScript = new RegExp('^' + relativePath + '\\/src\\/.+\\.js');
+function handleErrors(app, middleware) {
+	app.use(function(err, req, res, next) {
+		winston.error(req.path + '\n', err.stack);
 
-	res.status(404);
-
-	if (isClientScript.test(req.url)) {
-		res.type('text/javascript').status(200).send('');
-	} else if (isLanguage.test(req.url)) {
-		res.status(200).json({});
-	} else if (req.accepts('html')) {
-		if (process.env.NODE_ENV === 'development') {
-			winston.warn('Route requested but not found: ' + req.url);
+		if (err.code === 'EBADCSRFTOKEN') {
+			return res.sendStatus(403);
 		}
 
-		res.redirect(relativePath + '/404');
-	} else if (req.accepts('json')) {
-		if (process.env.NODE_ENV === 'development') {
-			winston.warn('Route requested but not found: ' + req.url);
+		if (parseInt(err.status, 10) === 302 && err.path) {
+			return res.locals.isAPI ? res.status(302).json(err.path) : res.redirect(err.path);
 		}
 
-		res.json({
-			error: 'Not found'
-		});
-	} else {
-		res.type('txt').send('Not found');
-	}
+		res.status(err.status || 500);
+
+		if (res.locals.isAPI) {
+			return res.json({path: req.path, error: err.message});
+		} else {
+			middleware.buildHeader(req, res, function() {
+				res.render('500', {path: req.path, error: err.message});
+			});
+		}
+	});
 }
+

@@ -1,5 +1,5 @@
 "use strict";
-/* global define, app, socket */
+/* global define, app, socket, templates */
 
 define('admin/appearance/skins', function() {
 	var Skins = {};
@@ -58,7 +58,8 @@ define('admin/appearance/skins', function() {
 					url: theme.preview,
 					css: theme.cssCdn
 				};
-			})
+			}),
+			showRevert: true
 		}, function(html) {
 			themeContainer.html(html);
 		});

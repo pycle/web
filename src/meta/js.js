@@ -7,7 +7,6 @@ var winston = require('winston'),
 	_ = require('underscore'),
 	os = require('os'),
 	nconf = require('nconf'),
-	cluster = require('cluster'),
 	fs = require('fs'),
 
 	plugins = require('../plugins'),
@@ -39,6 +38,7 @@ module.exports = function(Meta) {
 				'public/vendor/xregexp/unicode/unicode-base.js',
 				'public/vendor/buzz/buzz.min.js',
 				'public/vendor/mousetrap/mousetrap.js',
+				'public/vendor/autosize.js',
 				'./node_modules/templates.js/lib/templates.js',
 				'public/src/utils.js',
 				'public/src/app.js',
@@ -46,7 +46,6 @@ module.exports = function(Meta) {
 				'public/src/variables.js',
 				'public/src/widgets.js',
 				'public/src/translator.js',
-				'public/src/helpers.js',
 				'public/src/overrides.js'
 			],
 			rjs: []
@@ -127,7 +126,7 @@ module.exports = function(Meta) {
 	};
 
 	Meta.js.minify = function(minify, callback) {
-		if (!cluster.isWorker || process.env.cluster_setup === 'true') {
+		if (nconf.get('isPrimary') === 'true') {
 			var minifier = Meta.js.minifierProc = fork('minifier.js'),
 				onComplete = function(err) {
 					if (err) {
@@ -138,7 +137,7 @@ module.exports = function(Meta) {
 					winston.verbose('[meta/js] Minification complete');
 					minifier.kill();
 
-					if (cluster.isWorker) {
+					if (process.send) {
 						process.send({
 							action: 'js-propagate',
 							cache: Meta.js.cache,
@@ -211,23 +210,30 @@ module.exports = function(Meta) {
 
 	Meta.js.getFromFile = function(minify, callback) {
 		var scriptPath = path.join(__dirname, '../../public/nodebb.min.js'),
-			mapPath = path.join(__dirname, '../../public/nodebb.min.js.map');
+			mapPath = path.join(__dirname, '../../public/nodebb.min.js.map'),
+			paths = [scriptPath];
 		fs.exists(scriptPath, function(exists) {
 			if (exists) {
-				if (!cluster.isWorker || process.env.cluster_setup === 'true') {
-					winston.verbose('[meta/js] (Experimental) Reading client-side scripts from file');
-					async.map([scriptPath, mapPath], fs.readFile, function(err, files) {
-						Meta.js.cache = files[0];
-						Meta.js.map = files[1];
+				if (nconf.get('isPrimary') === 'true') {
+					fs.exists(mapPath, function(exists) {
+						if (exists) {
+							paths.push(mapPath);
+						}
 
-						emitter.emit('meta:js.compiled');
-						callback();
+						winston.verbose('[meta/js] Reading client-side scripts from file');
+						async.map(paths, fs.readFile, function(err, files) {
+							Meta.js.cache = files[0];
+							Meta.js.map = files[1] || '';
+
+							emitter.emit('meta:js.compiled');
+							callback();
+						});
 					});
 				} else {
 					callback();
 				}
 			} else {
-				winston.warn('[meta/js] (Experimental) No script file found on disk, re-minifying');
+				winston.warn('[meta/js] No script file found on disk, re-minifying');
 				Meta.js.minify.apply(Meta.js, arguments);
 			}
 		});

@@ -1,5 +1,5 @@
 "use strict";
-/*global define, ajaxify, app, socket, bootbox, Chart, RELATIVE_PATH*/
+/*global define, ajaxify, app, socket, utils, bootbox, Chart, RELATIVE_PATH*/
 
 define('admin/general/dashboard', ['semver'], function(semver) {
 	var	Admin = {},
@@ -32,9 +32,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 		});
 
 		$('#logout-link').on('click', function() {
-			$.post(RELATIVE_PATH + '/logout', function() {
-				window.location.href = RELATIVE_PATH + '/';
-			});
+			app.logout();
 		});
 
 		$.get('https://api.github.com/repos/NodeBB/NodeBB/tags', function(releases) {
@@ -195,7 +193,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 		var currentHour = new Date().getHours(),
 			labels = [];
 
-		for (var i = currentHour, ii = currentHour - 12; i > ii; i--) {
+		for (var i = currentHour, ii = currentHour - 24; i > ii; i--) {
 			var hour = i < 0 ? 24 + i : i;
 			labels.push(hour + ':00 ');
 		}
@@ -229,7 +227,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 						pointStrokeColor: "#fff",
 						pointHighlightFill: "#fff",
 						pointHighlightStroke: "rgba(220,220,220,1)",
-						data: [0,0,0,0,0,0,0,0,0,0,0,0]
+						data: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 					},
 					{
 						label: "Unique Visitors",
@@ -239,7 +237,7 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 						pointStrokeColor: "#fff",
 						pointHighlightFill: "#fff",
 						pointHighlightStroke: "rgba(151,187,205,1)",
-						data: [0,0,0,0,0,0,0,0,0,0,0,0]
+						data: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 					}
 				]
 			};
@@ -333,6 +331,11 @@ define('admin/general/dashboard', ['semver'], function(semver) {
 
 			graphs.traffic.scale.xLabels = getHoursArray();
 			graphs.traffic.update();
+
+			$('#pageViewsThisMonth').html(data.monthlyPageViews.thisMonth);
+			$('#pageViewsLastMonth').html(data.monthlyPageViews.lastMonth);
+			utils.addCommasToNumbers($('#pageViewsThisMonth'));
+			utils.addCommasToNumbers($('#pageViewsLastMonth'));
 		});
 	}
 

@@ -2,6 +2,7 @@
 
 var async = require('async'),
 
+	meta = require('../meta'),
 	db = require('../database'),
 	plugins = require('../plugins'),
 	user = require('../user'),
@@ -15,7 +16,6 @@ module.exports = function(Posts) {
 			tid = data.tid,
 			content = data.content,
 			timestamp = data.timestamp || Date.now();
-
 
 		if (!uid && parseInt(uid, 10) !== 0) {
 			return callback(new Error('[[error:invalid-uid]]'));
@@ -44,6 +44,14 @@ module.exports = function(Posts) {
 
 				if (data.toPid) {
 					postData.toPid = data.toPid;
+				}
+
+				if (data.ip && parseInt(meta.config.trackIpPerPost, 10) === 1) {
+					postData.ip = data.ip;
+				}
+
+				if (parseInt(uid, 10) === 0 && data.handle) {
+					postData.handle = data.handle;
 				}
 
 				plugins.fireHook('filter:post.save', postData, next);

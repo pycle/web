@@ -1,11 +1,11 @@
-"use strict";
+'use strict';
 
 var	nconf = require('nconf'),
-	net = require('net'),
 	fs = require('fs'),
 	url = require('url'),
 	path = require('path'),
-	cluster = require('cluster'),
+	fork = require('child_process').fork,
+
 	async = require('async'),
 	logrotate = require('logrotate-stream'),
 
@@ -13,15 +13,12 @@ var	nconf = require('nconf'),
 
 	pidFilePath = __dirname + '/pidfile',
 	output = logrotate({ file: __dirname + '/logs/output.log', size: '1m', keep: 3, compress: true }),
-	silent = process.env.NODE_ENV !== 'development' ? true : false,
+	silent = process.env.NODE_ENV !== 'development',
 	numProcs,
-	handles = {},
-	handleIndex = 0,
-	server,
+	workers = [],
 
 	Loader = {
 		timesStarted: 0,
-		shutdown_queue: [],
 		js: {
 			cache: undefined,
 			map: undefined
@@ -33,12 +30,6 @@ var	nconf = require('nconf'),
 	};
 
 Loader.init = function(callback) {
-	cluster.setupMaster({
-		exec: "app.js",
-		silent: silent
-	});
-	Loader.primaryWorker = 1;
-
 	if (silent) {
 		console.log = function(value) {
 			output.write(value + '\n');
@@ -61,102 +52,9 @@ Loader.displayStartupMessages = function(callback) {
 	callback();
 };
 
-Loader.addClusterEvents = function(callback) {
-	cluster.on('fork', function(worker) {
-		worker.on('message', function(message) {
-			if (message && typeof message === 'object' && message.action) {
-				var otherWorkers;
+Loader.addWorkerEvents = function(worker) {
 
-				switch (message.action) {
-					case 'ready':
-						if (Loader.js.cache) {
-							worker.send({
-								action: 'js-propagate',
-								cache: Loader.js.cache,
-								map: Loader.js.map,
-								hash: Loader.js.hash
-							});
-						}
-
-						if (Loader.css.cache) {
-							worker.send({
-								action: 'css-propagate',
-								cache: Loader.css.cache,
-								acpCache: Loader.css.acpCache,
-								hash: Loader.css.hash
-							});
-						}
-
-						// Kill an instance in the shutdown queue
-						var workerToKill = Loader.shutdown_queue.pop();
-						if (workerToKill) {
-							cluster.workers[workerToKill].kill();
-						}
-					break;
-					case 'restart':
-						console.log('[cluster] Restarting...');
-						Loader.restart(function(err) {
-							console.log('[cluster] Restarting...');
-						});
-					break;
-					case 'reload':
-						console.log('[cluster] Reloading...');
-						Loader.reload();
-					break;
-					case 'js-propagate':
-						Loader.js.cache = message.cache;
-						Loader.js.map = message.map;
-						Loader.js.hash = message.hash;
-
-						otherWorkers = Object.keys(cluster.workers).filter(function(worker_id) {
-							return parseInt(worker_id, 10) !== parseInt(worker.id, 10);
-						});
-
-						otherWorkers.forEach(function(worker_id) {
-							cluster.workers[worker_id].send({
-								action: 'js-propagate',
-								cache: message.cache,
-								map: message.map,
-								hash: message.hash
-							});
-						});
-					break;
-					case 'css-propagate':
-						Loader.css.cache = message.cache;
-						Loader.css.acpCache = message.acpCache;
-						Loader.css.hash = message.hash;
-
-						otherWorkers = Object.keys(cluster.workers).filter(function(worker_id) {
-							return parseInt(worker_id, 10) !== parseInt(worker.id, 10);
-						});
-
-						otherWorkers.forEach(function(worker_id) {
-							cluster.workers[worker_id].send({
-								action: 'css-propagate',
-								cache: message.cache,
-								acpCache: message.acpCache,
-								hash: message.hash
-							});
-						});
-					break;
-					case 'listening':
-						if (message.primary) {
-							Loader.primaryWorker = parseInt(worker.id, 10);
-						}
-					break;
-					case 'config:update':
-						Loader.notifyWorkers(message);
-					break;
-				}
-			}
-		});
-	});
-
-	cluster.on('listening', function(worker) {
-		console.log('[cluster] Child Process (' + worker.process.pid + ') listening for connections.');
-	});
-
-	cluster.on('exit', function(worker, code, signal) {
+	worker.on('exit', function(code, signal) {
 		if (code !== 0) {
 			if (Loader.timesStarted < numProcs*3) {
 				Loader.timesStarted++;
@@ -165,148 +63,176 @@ Loader.addClusterEvents = function(callback) {
 				}
 				Loader.crashTimer = setTimeout(function() {
 					Loader.timesStarted = 0;
-				});
+				}, 10000);
 			} else {
 				console.log(numProcs*3 + ' restarts in 10 seconds, most likely an error on startup. Halting.');
 				process.exit();
 			}
 		}
 
-		console.log('[cluster] Child Process (' + worker.process.pid + ') has exited (code: ' + code + ', signal: ' + signal +')');
-		if (!worker.suicide) {
+		console.log('[cluster] Child Process (' + worker.pid + ') has exited (code: ' + code + ', signal: ' + signal +')');
+		if (!(worker.suicide || code === 0)) {
 			console.log('[cluster] Spinning up another process...');
 
-			var wasPrimary = parseInt(worker.id, 10) === Loader.primaryWorker;
-			forkWorker(wasPrimary);
+			forkWorker(worker.index, worker.isPrimary);
 		}
 	});
 
-	cluster.on('disconnect', function(worker) {
-		console.log('[cluster] Child Process (' + worker.process.pid + ') has disconnected');
-	});
+	worker.on('message', function(message) {
+		if (message && typeof message === 'object' && message.action) {
+			switch (message.action) {
+				case 'ready':
+					if (Loader.js.cache) {
+						worker.send({
+							action: 'js-propagate',
+							cache: Loader.js.cache,
+							map: Loader.js.map,
+							hash: Loader.js.hash
+						});
+					}
 
-	callback();
+					if (Loader.css.cache) {
+						worker.send({
+							action: 'css-propagate',
+							cache: Loader.css.cache,
+							acpCache: Loader.css.acpCache,
+							hash: Loader.css.hash
+						});
+					}
+				break;
+				case 'restart':
+					console.log('[cluster] Restarting...');
+					Loader.restart();
+				break;
+				case 'reload':
+					console.log('[cluster] Reloading...');
+					Loader.reload();
+				break;
+				case 'js-propagate':
+					Loader.js.cache = message.cache;
+					Loader.js.map = message.map;
+					Loader.js.hash = message.hash;
+
+					Loader.notifyWorkers({
+						action: 'js-propagate',
+						cache: message.cache,
+						map: message.map,
+						hash: message.hash
+					}, worker.pid);
+				break;
+				case 'css-propagate':
+					Loader.css.cache = message.cache;
+					Loader.css.acpCache = message.acpCache;
+					Loader.css.hash = message.hash;
+
+					Loader.notifyWorkers({
+						action: 'css-propagate',
+						cache: message.cache,
+						acpCache: message.acpCache,
+						hash: message.hash
+					}, worker.pid);
+				break;
+			}
+		}
+	});
 };
 
 Loader.start = function(callback) {
+	numProcs = getPorts().length;
 	console.log('Clustering enabled: Spinning up ' + numProcs + ' process(es).\n');
 
-	for(var x=0; x<numProcs; ++x) {
-		forkWorker(x === 0);
+	for (var x=0; x<numProcs; ++x) {
+		forkWorker(x, x === 0);
 	}
-
-	var urlObject = url.parse(nconf.get('url'));
-	var port = urlObject.port || nconf.get('port') || nconf.get('PORT') || 4567;
- 	nconf.set('port', port);
-
-	server = net.createServer(function(connection) {
-		// remove this once node 0.12.x ships, see https://github.com/elad/node-cluster-socket.io/issues/4
-		connection._handle.readStop();
-
-		var workers = clusterWorkers();
-		var worker = workers[workerIndex(connection.remoteAddress, numProcs)];
-
-		if (worker) {
-			handles[handleIndex] = connection._handle;
-
-			worker.send({action: 'sticky-session:connection', handleIndex: handleIndex}, connection);
-			handleIndex ++;
-		} else {
-			console.log('Cant find worker! Worker count : ' + workers.length);
-		}
-
-	}).listen(port);
 
 	if (callback) {
 		callback();
 	}
 };
 
-function forkWorker(isPrimary) {
-	var worker = cluster.fork({
-			cluster_setup: isPrimary,
-			handle_jobs: isPrimary
-		}),
-		output = logrotate({ file: __dirname + '/logs/output.log', size: '1m', keep: 3, compress: true });
+function forkWorker(index, isPrimary) {
+	var ports = getPorts();
+
+	if(!ports[index]) {
+		return console.log('[cluster] invalid port for worker : ' + index + ' ports: ' + ports.length);
+	}
+
+	process.env.isPrimary = isPrimary;
+	process.env.isCluster = true;
+	process.env.port = ports[index];
+
+	var worker = fork('app.js', [], {
+		silent: silent,
+		env: process.env
+	});
+
+	worker.index = index;
+	worker.isPrimary = isPrimary;
+
+	workers[index] = worker;
+
+	Loader.addWorkerEvents(worker);
 
 	if (silent) {
-		worker.process.stdout.pipe(output);
-		worker.process.stderr.pipe(output);
+		var output = logrotate({ file: __dirname + '/logs/output.log', size: '1m', keep: 3, compress: true });
+		worker.stdout.pipe(output);
+		worker.stderr.pipe(output);
 	}
-
-	worker.on('message', function(message) {
-		if (!message || message.action !== 'sticky-session:accept') {
-			return;
-		}
-		var _handle = handles[message.handleIndex];
-
-		if (_handle) {
-			_handle.close();
-
-			delete handles[message.handleIndex];
-		}
-	});
 }
 
-function workerIndex(ip, numProcs) {
-	var s = '';
-	for (var i = 0, _len = ip.length; i < _len; i++) {
-		if (parseInt(ip[i], 10)) {
-			s += ip[i];
-		}
+function getPorts() {
+	var urlObject = url.parse(nconf.get('url'));
+	var port = nconf.get('port') || nconf.get('PORT') || urlObject.port || 4567;
+	if (!Array.isArray(port)) {
+		port = [port];
 	}
-	return Number(s) % numProcs || 0;
+	return port;
 }
 
-function clusterWorkers() {
-	var workers = [];
+Loader.restart = function() {
+	killWorkers();
 
-	for(var i in cluster.workers) {
-		workers.push(cluster.workers[i]);
-	}
-
-	return workers;
-}
-
-Loader.restart = function(callback) {
-	// Slate existing workers for termination -- welcome to death row.
-	Loader.shutdown_queue = Loader.shutdown_queue.concat(Object.keys(cluster.workers));
 	Loader.start();
 };
 
 Loader.reload = function() {
-	Object.keys(cluster.workers).forEach(function(worker_id) {
-		cluster.workers[worker_id].send({
+	workers.forEach(function(worker) {
+		worker.send({
 			action: 'reload'
 		});
 	});
 };
 
 Loader.stop = function() {
-	Object.keys(cluster.workers).forEach(function(id) {
-		// Gracefully close workers
-		cluster.workers[id].kill();
-	});
+	killWorkers();
 
 	// Clean up the pidfile
 	fs.unlinkSync(__dirname + '/pidfile');
-
-	server.close();
 };
 
-Loader.notifyWorkers = function (msg) {
-	Object.keys(cluster.workers).forEach(function(id) {
-		cluster.workers[id].send(msg);
+function killWorkers() {
+	workers.forEach(function(worker) {
+		worker.suicide = true;
+		worker.kill();
+	});
+}
+
+Loader.notifyWorkers = function(msg, worker_pid) {
+	worker_pid = parseInt(worker_pid, 10);
+	workers.forEach(function(worker) {
+		if (parseInt(worker.pid, 10) !== worker_pid) {
+			try {
+				worker.send(msg);
+			} catch (e) {
+				console.log('[cluster/notifyWorkers] Failed to reach pid ' + worker_pid);
+			}
+		}
 	});
 };
-
 
 nconf.argv().file({
 	file: path.join(__dirname, '/config.json')
 });
-
-numProcs = nconf.get('cluster') || 1;
-numProcs = (numProcs === true) ? require('os').cpus().length : numProcs;
 
 if (nconf.get('daemon') !== false) {
 	if (fs.existsSync(pidFilePath)) {
@@ -319,7 +245,10 @@ if (nconf.get('daemon') !== false) {
 		}
 	}
 
-	require('daemon')();
+	require('daemon')({
+		stdout: process.stdout,
+		stderr: process.stderr
+	});
 
 	fs.writeFile(__dirname + '/pidfile', process.pid);
 }
@@ -327,7 +256,6 @@ if (nconf.get('daemon') !== false) {
 async.series([
 	Loader.init,
 	Loader.displayStartupMessages,
-	Loader.addClusterEvents,
 	Loader.start
 ], function(err) {
 	if (err) {

@@ -18,11 +18,13 @@
 							<li><a href="#" class="remove-admin-user"><i class="fa fa-fw fa-ban"></i> Remove Admin</a></li>
 							<li class="divider"></li>
 							<li><a href="#" class="validate-email"><i class="fa fa-fw fa-check"></i> Validate Email</a></li>
+							<li><a href="#" class="send-validation-email"><i class="fa fa-fw fa-mail-forward"></i> Send Validation Email</a></li>
 							<li><a href="#" class="password-reset-email"><i class="fa fa-fw fa-key"></i> Send Password Reset Email</a></li>
 							<li class="divider"></li>
 							<li><a href="#" class="ban-user"><i class="fa fa-fw fa-gavel"></i> Ban User</a></li>
 							<li><a href="#" class="unban-user"><i class="fa fa-fw fa-comment-o"></i> Unban User</a></li>
 							<li><a href="#" class="reset-lockout"><i class="fa fa-fw fa-unlock"></i> Reset Lockout</a></li>
+							<li><a href="#" class="reset-flags"><i class="fa fa-fw fa-flag"></i> Reset Flags</a></li>
 							<li class="divider"></li>
 							<li><a href="#" class="delete-user"><i class="fa fa-fw fa-trash-o"></i> Delete User</a></li>
 						</ul>
@@ -33,17 +35,17 @@
 
 				<div class="search {search_display} well">
 					<label>By User Name</label>
-					<input class="form-control" id="search-user-name" type="text" placeholder="Enter a username to search"/><br />
+					<input class="form-control" id="search-user-name" data-search-type="username" type="text" placeholder="Enter a username to search"/><br />
 
 					<label>By Email </label>
-					<input class="form-control" id="search-user-email" type="text" placeholder="Enter a email to search"/><br />
+					<input class="form-control" id="search-user-email" data-search-type="email" type="text" placeholder="Enter a email to search"/><br />
+
+					<label>By IP Address </label>
+					<input class="form-control" id="search-user-ip" data-search-type="ip" type="text" placeholder="Enter an IP Address to search"/><br />
 
 					<i class="fa fa-spinner fa-spin hidden"></i>
 					<span id="user-notfound-notify" class="label label-danger hide">User not found!</span><br/>
-
-
 				</div>
-
 
 				<ul id="users-container">
 					<!-- BEGIN users -->
@@ -51,11 +53,11 @@
 						<div class="user-image">
 							<img src="{users.picture}" class="img-thumbnail user-selectable"/>
 							<div class="labels">
-								<!-- IF requireEmailConfirmation -->
+								<!-- IF config.requireEmailConfirmation -->
 								<!-- IF !users.email:confirmed -->
 								<span class="notvalidated label label-danger">Not Validated</span>
 								<!-- ENDIF !users.email:confirmed -->
-								<!-- ENDIF requireEmailConfirmation -->
+								<!-- ENDIF config.requireEmailConfirmation -->
 								<span class="administrator label label-primary <!-- IF !users.administrator -->hide<!-- ENDIF !users.administrator -->">Admin</span>
 								<span class="ban label label-danger <!-- IF !users.banned -->hide<!-- ENDIF !users.banned -->">Banned</span>
 							</div>
@@ -65,6 +67,9 @@
 						<!-- IF users.email -->
 						<small><span title="{users.email}">{users.email}</span></small>
 						<!-- ENDIF users.email -->
+						<!-- IF users.flags -->
+						<div><small><span><i class="fa fa-flag"></i> {users.flags}</span></small></div>
+						<!-- ENDIF users.flags -->
 					</div>
 					<!-- END users -->
 				</ul>
@@ -119,12 +124,12 @@
 		</div>
 	</div>
 
-	<div class="col-lg-3">
+	<div class="col-lg-3 acp-sidebar">
 		<div class="panel panel-default">
 			<div class="panel-heading">Users Control Panel</div>
 			<div class="panel-body">
 				<button id="createUser" class="btn btn-primary">New User</button>
-				<a target="_blank" href="/admin/users/csv" class="btn btn-primary">Download CSV</a>
+				<a target="_blank" href="{relative_path}/api/admin/users/csv" class="btn btn-primary">Download CSV</a>
 			</div>
 		</div>
 	</div>
