@@ -6,8 +6,9 @@ define('forum/topic/posts', [
 	'forum/pagination',
 	'forum/infinitescroll',
 	'forum/topic/postTools',
-	'navigator'
-], function(pagination, infinitescroll, postTools, navigator) {
+	'navigator',
+	'paginator'
+], function(pagination, infinitescroll, postTools, navigator, paginator) {
 
 	var Posts = {};
 
@@ -109,28 +110,17 @@ define('forum/topic/posts', [
 		data.title = $('<div></div>').text(ajaxify.variables.get('topic_name')).html();
 		data.viewcount = ajaxify.variables.get('viewcount');
 
+		//paginator.disableReverseLoading = true;
 		infinitescroll.parseAndTranslate('topic', 'posts', data, function(html) {
 			if (after) {
 				html.insertAfter(after);
 			} else if (before) {
-				// Save document height and position for future reference (about 5 lines down)
-				var height = $(document).height(),
-					scrollTop = $(document).scrollTop(),
-					originalPostEl = $('.post-row[data-index="0"]');
-
-				// Insert the new post
+				var amountScrolledFromBottom = $('#content').height() - $('#frame').scrollTop();
 				html.insertBefore(before);
-
-				// If the user is not at the top of the page... (or reasonably so...)
-				if (scrollTop > originalPostEl.offset().top) {
-					// Now restore the relative position the user was on prior to new post insertion
-					$(document).scrollTop(scrollTop + ($(document).height() - height));
-				}
+				paginator.scrollTo($('#content').height() - amountScrolledFromBottom);
 			} else {
 				$('#post-container').append(html);
 			}
-
-			html.hide().fadeIn('slow');
 
 			var pids = [];
 			for(var i=0; i<data.posts.length; ++i) {

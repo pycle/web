@@ -162,6 +162,9 @@ define('paginator', ['forum/pagination'], function(pagination) {
 		updatePaginatedScrollbar();
 	};
 
+	paginator.scrollTo = function(to) {
+		ui.frame.scrollTop(to);
+	};
 
 	paginator.onScroll = function(cb) {
 		var prevPos = ui.frame.scrollTop();
