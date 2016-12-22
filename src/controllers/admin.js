@@ -28,7 +28,8 @@ var adminController = {
 	themes: require('./admin/themes'),
 	users: require('./admin/users'),
 	uploads: require('./admin/uploads'),
-	info: require('./admin/info')
+	info: require('./admin/info'),
+	reports: require('./admin/reports')
 };
 
 

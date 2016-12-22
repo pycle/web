@@ -21,6 +21,7 @@
 			<li><a href="{relative_path}/admin/manage/groups">[[admin/menu:manage/groups]]</a></li>
 			<li><a href="{relative_path}/admin/manage/flags">[[admin/menu:manage/flags]]</a></li>
 			<li><a href="{relative_path}/admin/manage/ip-blacklist">[[admin/menu:manage/ip-blacklist]]</a></li>
+			<li><a href="{relative_path}/admin/manage/reports">[[admin/menu:manage/reports]]</a></li>
 		</ul>
 	</section>
 
@@ -194,6 +195,7 @@
 					<li><a href="{relative_path}/admin/manage/groups">[[admin/menu:manage/groups]]</a></li>
 					<li><a href="{relative_path}/admin/manage/flags">[[admin/menu:manage/flags]]</a></li>
 					<li><a href="{relative_path}/admin/manage/ip-blacklist">[[admin/menu:manage/ip-blacklist]]</a></li>
+					<li><a href="{relative_path}/admin/manage/reports">[[admin/menu:manage/reports]]</a></li>
 				</ul>
 			</li>
 			<li class="dropdown menu-item">

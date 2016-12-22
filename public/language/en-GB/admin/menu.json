@@ -15,6 +15,7 @@
 	"manage/groups": "Groups",
 	"manage/flags": "Flags",
 	"manage/ip-blacklist": "IP Blacklist",
+	"manage/reports": "Reports",
 
 	"section-settings": "Settings",
 	"settings/general": "General",
