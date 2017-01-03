@@ -1,0 +1,57 @@
+.custom-reports {
+	.report-info {
+		background-color: #333;
+		color: white;
+		padding: 8px 20px;
+		margin-bottom: 20px;
+
+		small {
+			font-size: 10px;
+			text-transform: uppercase;
+		}
+	}
+	.trackedHook {
+		.transition(.25s ease-in-out border-color);
+		position: relative;
+		padding: 10px;
+		cursor: pointer;
+
+
+		.fa-line-chart {
+			.transition(.25s ease-in-out opacity);
+			opacity: 0;
+		}
+
+		&.active {
+			border-color: cadetblue;
+			.fa-line-chart {
+				opacity: 1;
+			}
+		}
+
+		.badge {
+			font-size: 10px;
+			text-transform: uppercase;
+			padding: 0;
+			background: none;
+			color: black;
+			position: absolute;
+		}
+
+		code {
+			margin-top: 10px;
+			display: block;
+		}
+	}
+
+	[data-action="delete"] {
+		position: absolute;
+		top: 7px;
+		right: 7px;
+		cursor: pointer;
+	}
+
+	.graph-container {
+		position: relative;
+	}
+}

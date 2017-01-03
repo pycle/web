@@ -5,20 +5,24 @@ var db = require('./database');
 var async = require('async');
 var reports = module.exports;
 
-reports.new = function (hook, callback) {
+reports.create = function (hook, callback) {
 	if (!hook) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
-	db.setAdd('reports:hooks_tracked', hook, callback);
+	db.incrObjectField('global', 'nextReportId', function(err, reportId) {
+		db.setAdd('reports:hooks_tracked', reportId);
+		db.setObject('reports:hooks_tracked:' + reportId, hook, callback);
+	});
 };
 
-reports.delete = function (hook, callback) {
-	if (!hook) {
+reports.delete = function (reportId, callback) {
+	if (!reportId) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
-	db.setRemove('reports:hooks_tracked', hook, callback);
+	db.setRemove('reports:hooks_tracked', reportId);
+	db.delete('reports:hooks_tracked:' + reportId, callback);
 };
 
 reports.getTrackedHooks = function (callback) {
@@ -27,11 +31,22 @@ reports.getTrackedHooks = function (callback) {
 			return callback(err);
 		}
 
-		async.each(hooks_tracked, function (hook, next) {
-			async.parallel({
-				'hourly': async.apply(analytics.getHourlyStatsForSet, 'reports:' + hook, Date.now(), 24),
-				'daily': async.apply(analytics.getDailyStatsForSet, 'reports:' + hook, Date.now(), 30)
-			}, next);
-		}, callback);
+		var tracked = [];
+
+		async.each(hooks_tracked, function (reportId, next) {
+			db.getObject('reports:hooks_tracked:' + reportId, function(err, hook) {				
+				async.parallel({
+					'hourly': async.apply(analytics.getHourlyStatsForSet, 'reports:' + hook.type + ':' + hook.name, Date.now(), 24),
+					'daily': async.apply(analytics.getDailyStatsForSet, 'reports:' + hook.type + ':' + hook.name, Date.now(), 30)
+				}, function (err, stats) {
+					hook.stats = stats;
+					hook.reportId = reportId;
+					tracked.push(hook);
+					next(err);
+				});
+			});
+		}, function(err) {
+			callback(err, tracked);
+		});
 	});
 };
