@@ -16,11 +16,13 @@ var uniquevisitors = 0;
 
 var isCategory = /^(?:\/api)?\/category\/(\d+)/;
 
-new cronJob('*/10 * * * *', function () {
+new cronJob('*/1 * * * *', function () {
+	console.log('writing data');
 	Analytics.writeData();
 }, null, true);
 
-Analytics.increment = function (keys) {
+Analytics.increment = function (keys) { 
+	console.log(keys);
 	keys = Array.isArray(keys) ? keys : [keys];
 
 	keys.forEach(function (key) {

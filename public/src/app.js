@@ -84,6 +84,8 @@ app.cacheBuster = null;
 
 			$(window).trigger('action:app.load');
 		});
+		
+		setupHookListener();
 	};
 
 	app.logout = function () {
@@ -659,4 +661,16 @@ app.cacheBuster = null;
 		});
 
 	};
+
+	function setupHookListener() {
+		if (config.hooksToListenTo.length) {
+			$(window).on(config.hooksToListenTo.join(' '), function(ev) {
+				console.log(ev.type);
+				utils.debounce(function () {
+					console.log('fired', ev.type);
+					socket.emit('reports.hookFired', { hook: ev.type });
+				}, 1000);
+			});
+		}
+	}
 }());

@@ -1,7 +1,7 @@
 "use strict";
-/*global define, ajaxify, app, socket, utils, bootbox, RELATIVE_PATH*/
+/*global define, ajaxify, app, socket, utils, bootbox, templates*/
 
-define('admin/manage/reports', ['Chart', 'translator'], function (Chart, translator) {
+define('admin/manage/reports', ['Chart'], function (Chart) {
 	var	reports = {};
 	var charts = {};
 
@@ -66,6 +66,8 @@ define('admin/manage/reports', ['Chart', 'translator'], function (Chart, transla
 				hookCategories[typeSelector.val()].forEach(function(category) {
 					categorySelector.append($('<option value="' + category + '">' + category + '</option>'));
 				});
+
+				categorySelector.change();
 			});
 
 			categorySelector.on('change', function() {
@@ -105,7 +107,9 @@ define('admin/manage/reports', ['Chart', 'translator'], function (Chart, transla
 		});
 	}
 
-	function deleteReport () {
+	function deleteReport (ev) {
+		ev.stopPropagation();
+
 		var reportId = $(this).parents().attr('data-reportId');
 
 		bootbox.confirm('[[admin/admin:alert.confirm-restart]]', function (confirm) {
@@ -141,9 +145,9 @@ define('admin/manage/reports', ['Chart', 'translator'], function (Chart, transla
 				var color = i * 40 % 360;
 				datasets.push({
 					label: hookData.hook,
-					backgroundColor: 'hsl(' + color + ', 100%, 50%)',
+					backgroundColor: 'hsla(' + color + ', 100%, 50%, 0.25)',
 					borderColor: 'hsl(' + color + ', 50%, 50%)',
-					pointBackgroundColor: 'hsl(' + color + ', 100%, 50%)',
+					pointBackgroundColor: 'hsl(' + color + ', 50%, 50%)',
 					pointHoverBackgroundColor: "#fff",
 					pointBorderColor: "#fff",
 					pointHoverBorderColor: 'hsl(' + color + ', 75%, 50%)',
@@ -167,9 +171,7 @@ define('admin/manage/reports', ['Chart', 'translator'], function (Chart, transla
 				maintainAspectRatio: false,
 				legend: {
 					display: true,
-					onClick: function(ev, legendItem) {
-						console.log(legendItem);
-					}
+					onClick: function() { return false; }
 				},
 				scales: {
 					yAxes: [{
@@ -180,8 +182,6 @@ define('admin/manage/reports', ['Chart', 'translator'], function (Chart, transla
 				}
 			}
 		});
-
-		charts[type].units = type === 'daily' ? 'days' : 'hours';
 	}
 
 	return reports;

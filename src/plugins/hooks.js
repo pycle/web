@@ -1,7 +1,8 @@
 'use strict';
 
-var winston = require('winston'),
-	async = require('async');
+var winston = require('winston');
+var async = require('async');
+var reports = require('../reports');
 
 module.exports = function (Plugins) {
 	Plugins.deprecatedHooks = {
@@ -81,6 +82,8 @@ module.exports = function (Plugins) {
 
 		var hookList = Plugins.loadedHooks[hook];
 		var hookType = hook.split(':')[0];
+
+		reports.hookFired('server', hook);
 
 		switch (hookType) {
 			case 'filter':

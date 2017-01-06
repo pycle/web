@@ -17,7 +17,7 @@ reportsController.get = function (req, res, next) {
 };
 
 function renderPage (req, res, next) {	
-	reports.getTrackedHooks(function (err, hooksTracked) {
+	reports.getTrackedHooksData(function (err, hooksTracked) {
 		if (err) {
 			return next(err);
 		}

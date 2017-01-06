@@ -12,7 +12,6 @@ adminReports.create = function (socket, data, callback) {
 };
 
 adminReports.delete = function (socket, reportId, callback) {
-	console.log(reportId);
 	if (!reportId) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
