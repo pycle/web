@@ -202,9 +202,6 @@ function start() {
 			});
 		},
 		function (next) {
-			require('./src/reports').init(next);
-		},
-		function (next) {
 			var webserver = require('./src/webserver');
 			require('./src/socket.io').init(webserver.server);
 
