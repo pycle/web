@@ -664,12 +664,10 @@ app.cacheBuster = null;
 
 	function setupHookListener() {
 		if (config.hooksToListenTo.length) {
-			$(window).on(config.hooksToListenTo.join(' '), function(ev) {
-				console.log(ev.type);
+			$(window).on(config.hooksToListenTo.join(' '), function (ev) {
 				utils.debounce(function () {
-					console.log('fired', ev.type);
-					socket.emit('reports.hookFired', { hook: ev.type });
-				}, 1000);
+					socket.emit('reports.hookFired', { hook: ev.type + (ev.namespace ? ('.' + ev.namespace) : '') });
+				}, 1000)();
 			});
 		}
 	}

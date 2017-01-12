@@ -2,9 +2,9 @@
 	<div class="row">
 		<div class="col-xs-3">
 			<!-- IF !hooksTracked.length -->
-			<div class="alert alert-info">No custom reports have been created yet.</div>
+			<div class="alert alert-info">[[admin/manage/reports:none]]</div>
 			<!-- ELSE -->
-			<div class="report-info">Select a hook to view data<br /><small>Ctrl-click to select multiple</small></div>
+			<div class="report-info">[[admin/manage/reports:select_a_hook]]<br /><small>[[admin/manage/reports:ctrl_click]]</small></div>
 			<!-- ENDIF !hooksTracked.length -->
 
 			<!-- BEGIN hooksTracked -->
@@ -17,7 +17,7 @@
 
 		<div class="col-xs-9">
 			<div class="panel panel-default">
-				<div class="panel-heading">Hourly Report - Past 24 Hours</div>
+				<div class="panel-heading">[[admin/manage/reports:hourly]]</div>
 				<div class="panel-body">
 					<div class="graph-container">
 						<canvas id="custom-report-hourly" width="100%" height="400"></canvas>
@@ -26,7 +26,7 @@
 			</div>
 
 			<div class="panel panel-default">
-				<div class="panel-heading">Daily Report - Past Month</div>
+				<div class="panel-heading">[[admin/manage/reports:daily]]</div>
 				<div class="panel-body">
 					<div class="graph-container">
 						<canvas id="custom-report-daily" width="100%" height="400"></canvas>

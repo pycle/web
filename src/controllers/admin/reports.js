@@ -16,7 +16,7 @@ reportsController.get = function (req, res, next) {
 	}
 };
 
-function renderPage (req, res, next) {	
+function renderPage(req, res, next) {	
 	reports.getTrackedHooksData(function (err, hooksTracked) {
 		if (err) {
 			return next(err);
@@ -29,7 +29,7 @@ function renderPage (req, res, next) {
 	});
 }
 
-function getAvailableHooks (callback) {
+function getAvailableHooks(callback) {
 	var url = (nconf.get('hooks_url') || 'https://hooks.nodebb.org');
 
 	require('request')(url, {

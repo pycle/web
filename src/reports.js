@@ -13,7 +13,7 @@ reports.create = function (hook, callback) {
 		return callback(new Error('[[error:invalid-data]]'));
 	}
 
-	db.incrObjectField('global', 'nextReportId', function(err, reportId) {
+	db.incrObjectField('global', 'nextReportId', function (err, reportId) {
 		db.setAdd('reports:hooks_tracked', reportId);
 		db.setObject('reports:hooks_tracked:' + reportId, hook, callback);
 	});
@@ -37,13 +37,13 @@ reports.getTrackedHooks = function (callback) {
 		var tracked = [];
 
 		async.each(reportIds, function (reportId, next) {
-			db.getObject('reports:hooks_tracked:' + reportId, function(err, hook) {
+			db.getObject('reports:hooks_tracked:' + reportId, function (err, hook) {
 				hook.reportId = reportId;
 				tracked.push(hook);
 				reports.hooksToListenTo[hook.type].push(hook.hook);
 				next(err);
 			});
-		}, function(err) {
+		}, function (err) {
 			callback(err, tracked);
 		});
 	});
@@ -59,7 +59,7 @@ reports.getTrackedHooksData = function (callback) {
 				hook.stats = stats;
 				next(err);
 			});
-		}, function(err) {
+		}, function (err) {
 			callback(err, hooks);
 		});
 	});
@@ -76,5 +76,5 @@ reports.hookFired = function (type, hook) {
 };
 
 reports.init = function (callback) {
-	reports.getTrackedHooks(function() { callback(null); });
+	reports.getTrackedHooks(function () { callback(null); });
 };

@@ -1,0 +1,11 @@
+{
+	"reports": "Reports",
+	"none": "No custom reports have been created yet.",
+	"select_a_hook": "Select a hook to view data",
+	"ctrl_click": "Ctrl-click to select multiple",
+	"daily": "Daily Report - Past Month",
+	"hourly": "Hourly Report - Past 24 Hours",
+	"hook": "Hook",
+	"hook_type": "Hook Type",
+	"hook_category": "Hook Category"
+}

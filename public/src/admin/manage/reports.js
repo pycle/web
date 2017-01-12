@@ -18,8 +18,8 @@ define('admin/manage/reports', ['Chart'], function (Chart) {
 		setupGraphs();
 	};
 
-	function setupHookHandlers () {
-		$('.trackedHook').on('click', function(ev) {
+	function setupHookHandlers() {
+		$('.trackedHook').on('click', function (ev) {
 			var displayed = ev.ctrlKey ? JSON.parse(localStorage.getItem('acp.reports:displayed_hooks')) : [];
 			var reportId = parseInt($(this).attr('data-reportId'), 10);
 			
@@ -34,7 +34,7 @@ define('admin/manage/reports', ['Chart'], function (Chart) {
 		});
 	}
 
-	function openReportModal () {
+	function openReportModal() {
 		templates.parse('admin/partials/create_report_modal', {}, function (html) {
 			var modal = bootbox.dialog({
 				message: html,
@@ -60,20 +60,20 @@ define('admin/manage/reports', ['Chart'], function (Chart) {
 			var categorySelector = modal.find('#hook-category');
 			var hookSelector = modal.find('#hook-name');
 
-			typeSelector.on('change', function() {
+			typeSelector.on('change', function () {
 				categorySelector.html('');
 
-				hookCategories[typeSelector.val()].forEach(function(category) {
+				hookCategories[typeSelector.val()].forEach(function (category) {
 					categorySelector.append($('<option value="' + category + '">' + category + '</option>'));
 				});
 
 				categorySelector.change();
 			});
 
-			categorySelector.on('change', function() {
+			categorySelector.on('change', function () {
 				hookSelector.html('');
 
-				ajaxify.data.availableHooks[typeSelector.val()][categorySelector.val()].hooks.forEach(function(hook) {
+				ajaxify.data.availableHooks[typeSelector.val()][categorySelector.val()].hooks.forEach(function (hook) {
 					if ($('.trackedHook[data-hookType="' + typeSelector.val() + '"][data-hookName="' + hook.hook + '"]').length) {
 						return;
 					}
@@ -87,7 +87,7 @@ define('admin/manage/reports', ['Chart'], function (Chart) {
 		});
 	}
 
-	function createReport (modal) {
+	function createReport(modal) {
 		var report = {
 			type: modal.find('#hook-type').val(),
 			category: modal.find('#hook-category').val(),
@@ -107,7 +107,7 @@ define('admin/manage/reports', ['Chart'], function (Chart) {
 		});
 	}
 
-	function deleteReport (ev) {
+	function deleteReport(ev) {
 		ev.stopPropagation();
 
 		var reportId = $(this).parents().attr('data-reportId');
@@ -171,7 +171,7 @@ define('admin/manage/reports', ['Chart'], function (Chart) {
 				maintainAspectRatio: false,
 				legend: {
 					display: true,
-					onClick: function() { return false; }
+					onClick: function () { return false; }
 				},
 				scales: {
 					yAxes: [{

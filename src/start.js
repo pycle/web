@@ -41,7 +41,7 @@ start.start = function () {
 			});
 		},
 		function (next) {
-			require('./src/reports').init(next);
+			require('./reports').init(next);
 		},
 		function (next) {
 			var webserver = require('./webserver');
