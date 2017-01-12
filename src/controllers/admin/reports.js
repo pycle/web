@@ -1,6 +1,7 @@
 "use strict";
 
 var reports = require('../../reports');
+var plugins = require('../../plugins');
 var cache = require('lru-cache')({ max: 40000, maxAge: 1000 * 60 * 60 });
 var availableHooks = cache.get('hooks:available');
 var nconf = require('nconf');
@@ -39,9 +40,11 @@ function getAvailableHooks(callback) {
 			return callback(err, {});
 		}
 
-		availableHooks = body;
-		cache.set('hooks:available', body);
-		callback();
+		plugins.fireHook('filter:admin.reports.getAvailableHooks', body, function(err, body) {
+			availableHooks = body;
+			cache.set('hooks:available', body);
+			callback();
+		});
 	});
 }
 
