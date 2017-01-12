@@ -13,7 +13,6 @@
 	"manage/users": "Users",
 	"manage/registration": "Registration Queue",
 	"manage/groups": "Groups",
-	"manage/flags": "Flags",
 	"manage/ip-blacklist": "IP Blacklist",
 	"manage/reports": "Reports",
 
@@ -40,7 +39,7 @@
 	"section-appearance": "Appearance",
 	"appearance/themes": "Themes",
 	"appearance/skins": "Skins",
-	"appearance/customise": "Custom HTML &amp; CSS",
+	"appearance/customise": "Custom HTML & CSS",
 
 	"section-extend": "Extend",
 	"extend/plugins": "Plugins",

@@ -35,6 +35,7 @@
 	"chat": "Chat",
 	"chat_with": "Continue chat with %1",
 	"new_chat_with": "Start new chat with %1",
+	"flag-profile": "Flag Profile",
 	"follow": "Follow",
 	"unfollow": "Unfollow",
 	"more": "More",
@@ -67,6 +68,7 @@
 	"upload_a_picture": "Upload a picture",
 	"remove_uploaded_picture" : "Remove Uploaded Picture",
 	"upload_cover_picture": "Upload cover picture",
+	"remove_cover_picture_confirm": "Are you sure you want to remove the cover picture?",
 
 	"settings": "Settings",
 	"show_email": "Show My Email",

@@ -40,7 +40,8 @@ function mainRoutes(app, middleware, controllers) {
 }
 
 function modRoutes(app, middleware, controllers) {
-	setupPageRoute(app, '/posts/flags', middleware, [], controllers.mods.flagged);
+	setupPageRoute(app, '/flags', middleware, [], controllers.mods.flags.list);
+	setupPageRoute(app, '/flags/:flagId', middleware, [], controllers.mods.flags.detail);
 }
 
 function globalModRoutes(app, middleware, controllers) {
@@ -144,7 +145,7 @@ module.exports = function (app, middleware, hotswapIds) {
 	}
 
 	app.use(middleware.privateUploads);
-	app.use(relativePath + '/api/language/:language/:namespace', middleware.getTranslation);
+	app.use(relativePath + '/api/language/:language/(([a-zA-Z0-9\\-_.\\/]+))', middleware.getTranslation);
 	app.use(relativePath, express.static(path.join(__dirname, '../../', 'public'), {
 		maxAge: app.enabled('cache') ? 5184000000 : 0
 	}));
