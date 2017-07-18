@@ -1,7 +1,7 @@
 'use strict';
 
 
-define('admin/manage/users', ['translator'], function (translator) {
+define('admin/manage/users', ['translator', 'components'], function (translator, components) {
 	var Users = {};
 
 	Users.init = function () {
@@ -52,7 +52,7 @@ define('admin/manage/users', ['translator'], function (translator) {
 			};
 		}
 
-		$('[component="user/select/all"]').on('click', function () {
+		components.get('user/select/all').on('click', function () {
 			if ($(this).is(':checked')) {
 				$('.users-table [component="user/select/single"]').prop('checked', true);
 			} else {
@@ -354,7 +354,7 @@ define('admin/manage/users', ['translator'], function (translator) {
 	};
 
 	function handleInvite() {
-		$('[component="user/invite"]').on('click', function () {
+		components.get('user/invite').on('click', function () {
 			bootbox.prompt('[[admin/manage/users:alerts.prompt-email]]', function (email) {
 				if (!email) {
 					return;

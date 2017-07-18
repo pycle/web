@@ -38,8 +38,9 @@
 				search.init();
 			});
 		}
-
-		$('[component="logout"]').on('click', app.logout);
+		require(['components'], function (components) {
+			components.get('logout').on('click', app.logout);
+		});
 		app.alert = launchSnackbar;
 
 		configureSlidemenu();

@@ -6,7 +6,8 @@ define('admin/manage/group', [
 	'iconSelect',
 	'admin/modules/colorpicker',
 	'translator',
-], function (memberList, iconSelect, colorpicker, translator) {
+	'components'
+], function (memberList, iconSelect, colorpicker, translator, components) {
 	var Groups = {};
 
 	Groups.init = function () {
@@ -106,13 +107,13 @@ define('admin/manage/group', [
 					},
 				}, function (html) {
 					translator.translate(html, function (html) {
-						$('[component="groups/members"] tbody').prepend(html);
+						components.get('groups/members').find('tbody').prepend(html);
 					});
 				});
 			});
 		});
 
-		$('[component="groups/members"]').on('click', '[data-action]', function () {
+		components.get('groups/members').on('click', '[data-action]', function () {
 			var btnEl = $(this);
 			var userRow = btnEl.parents('[data-uid]');
 			var ownerFlagEl = userRow.find('.member-name i');
