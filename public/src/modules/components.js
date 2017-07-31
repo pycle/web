@@ -7,7 +7,7 @@ define('components', function () {
 		'topic/teaser': function (tid) {
 			if (tid) {
 				var cmp = getComponent('category/topic', 'tid', tid);
-				return findInComponent(cmp, 'topic/teaser');
+				return components.findInComponent(cmp, 'topic/teaser');
 			}
 			return getComponent('topic/teaser');
 		},
@@ -18,19 +18,19 @@ define('components', function () {
 			return getComponent('post', name, value);
 		},
 		'post/content': function (pid) {
-			return findInComponent(components.core.post('pid', pid), 'post/content');
+			return components.findInComponent(components.core.post('pid', pid), 'post/content');
 		},
 		'post/header': function (pid) {
-			return findInComponent(components.core.post('pid', pid), 'post/header');
+			return components.findInComponent(components.core.post('pid', pid), 'post/header');
 		},
 		'post/anchor': function (index) {
-			return findInComponent(components.core.post('index', index), 'post/anchor');
+			return components.findInComponent(components.core.post('index', index), 'post/anchor');
 		},
 		'post/vote-count': function (pid) {
-			return findInComponent(components.core.post('pid', pid), 'post/vote-count');
+			return components.findInComponent(components.core.post('pid', pid), 'post/vote-count');
 		},
 		'post/bookmark-count': function (pid) {
-			return findInComponent(components.core.post('pid', pid), 'post/bookmark-count');
+			return components.findInComponent(components.core.post('pid', pid), 'post/bookmark-count');
 		},
 
 		'user/postcount': function (uid) {
@@ -51,7 +51,7 @@ define('components', function () {
 			return getComponent('chat/message', 'mid', messageId);
 		},
 		'chat/message/body': function (messageId) {
-			return findInComponent(getComponent('chat/message', 'mid', messageId), 'chat/message/body');
+			return components.findInComponent(getComponent('chat/message', 'mid', messageId), 'chat/message/body');
 		},
 	};
 
@@ -78,14 +78,14 @@ define('components', function () {
 		return cmp;
 	}
 
-	function findInComponent(cmp, componentName) {
+	components.findInComponent = function(cmp, componentName) {
 		var child = cmp.find('[data-component="' + componentName + '"]');
 		if (!child.length) {
 			// backwards compatibility
 			child = cmp.find('[component="' + componentName + '"]');
 		}
 		return child;
-	}
+	};
 
 	return components;
 });

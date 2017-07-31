@@ -8,7 +8,8 @@ define('admin/manage/category', [
 	'autocomplete',
 	'translator',
 	'categorySelector',
-], function (uploader, iconSelect, colorpicker, autocomplete, translator, categorySelector) {
+	'components',
+], function (uploader, iconSelect, colorpicker, autocomplete, translator, categorySelector, components) {
 	var	Category = {};
 	var modified_categories = {};
 
@@ -422,7 +423,9 @@ define('admin/manage/category', [
 						},
 					},
 				});
-				categorySelector.init(modal.find('[component="category-selector"]'));
+
+				categorySelector.init(components.findInComponent(modal, 'category-selector'));
+
 				function submit(ev) {
 					ev.preventDefault();
 					var selectedCategory = categorySelector.getSelectedCategory();
